@@ -1,0 +1,502 @@
+{
+  "_meta": {
+    "source": "q-eAON Tier-1 curated IARC KC + IRIS/OEHHA dose anchor"
+  },
+  "chemicals": [
+    {
+      "name": "Benzene",
+      "casrn": "71-43-2",
+      "iarc_group": "1",
+      "g": 1.0,
+      "p": 1.0,
+      "kc": [
+        1,
+        1,
+        1,
+        0.5,
+        1,
+        0,
+        1,
+        0.5,
+        0,
+        1
+      ],
+      "kc_strong": [
+        1,
+        2,
+        3,
+        5,
+        7,
+        10
+      ],
+      "mechanism": "Metabolically activated genotoxin (CYP2E1) with oxidative stress, immunosuppression and bone-marrow proliferation.",
+      "monograph": "IARC Monographs Vol. 120 (2018)",
+      "iris": {
+        "osf": 0.055,
+        "iur": 7.8e-06,
+        "rfd": 0.004,
+        "rfc": 0.03,
+        "source": "IRIS 2000/2003",
+        "moa": "linear"
+      },
+      "aed_pod_mgkgday": 0.001818,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "Formaldehyde",
+      "casrn": "50-00-0",
+      "iarc_group": "1",
+      "g": 0.75,
+      "p": 0.25,
+      "kc": [
+        1,
+        1,
+        0,
+        0,
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        1,
+        2
+      ],
+      "mechanism": "Direct-acting genotoxin (DNA-protein crosslinks) plus cytotoxicity-driven regenerative proliferation at the portal of entry.",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": null,
+        "iur": 1.1e-05,
+        "rfd": null,
+        "rfc": 0.007,
+        "source": "IRIS 2024 (inhalation)",
+        "moa": "linear"
+      },
+      "aed_pod_mgkgday": 0.002597,
+      "pod_basis": "inhalation unit risk"
+    },
+    {
+      "name": "Benzo[a]pyrene",
+      "casrn": "50-32-8",
+      "iarc_group": "1",
+      "g": 1.0,
+      "p": 1.0,
+      "kc": [
+        1,
+        1,
+        0.5,
+        0,
+        1,
+        0.5,
+        0.5,
+        1,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        1,
+        2,
+        5,
+        8
+      ],
+      "mechanism": "Metabolically activated electrophilic genotoxin (diol-epoxide, DNA adducts); also AhR receptor-mediated.",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": 1.0,
+        "iur": 0.0006,
+        "rfd": 0.0003,
+        "rfc": 2e-06,
+        "source": "IRIS 2017",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 0.0001,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "Vinyl chloride",
+      "casrn": "75-01-4",
+      "iarc_group": "1",
+      "g": 0.667,
+      "p": 0.167,
+      "kc": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        1,
+        2
+      ],
+      "mechanism": "Metabolically activated direct genotoxin; etheno-DNA adducts (liver angiosarcoma).",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": 1.5,
+        "iur": 8.8e-06,
+        "rfd": 0.003,
+        "rfc": 0.1,
+        "source": "IRIS 2000",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 6.667e-05,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "1,3-Butadiene",
+      "casrn": "106-99-0",
+      "iarc_group": "1",
+      "g": 0.917,
+      "p": 0.083,
+      "kc": [
+        1,
+        1,
+        0.5,
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "kc_strong": [
+        1,
+        2
+      ],
+      "mechanism": "Metabolically activated electrophilic genotoxin (mono-/di-epoxides); diepoxide is the potent clastogen.",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": null,
+        "iur": 3e-05,
+        "rfd": null,
+        "rfc": 0.002,
+        "source": "IRIS 2002",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 0.0009524,
+      "pod_basis": "inhalation unit risk"
+    },
+    {
+      "name": "Ethylene oxide",
+      "casrn": "75-21-8",
+      "iarc_group": "1",
+      "g": 0.667,
+      "p": 0.0,
+      "kc": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "kc_strong": [
+        1,
+        2
+      ],
+      "mechanism": "Directly electrophilic alkylating genotoxin (no activation needed).",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": null,
+        "iur": 0.003,
+        "rfd": null,
+        "rfc": null,
+        "source": "IRIS 2016",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 9.524e-06,
+      "pod_basis": "inhalation unit risk"
+    },
+    {
+      "name": "Trichloroethylene",
+      "casrn": "79-01-6",
+      "iarc_group": "1",
+      "g": 0.5,
+      "p": 0.5,
+      "kc": [
+        0.5,
+        0.5,
+        0,
+        0.5,
+        0.5,
+        0,
+        0,
+        0.5,
+        0,
+        0.5
+      ],
+      "kc_strong": [],
+      "mechanism": "Metabolism-dependent, organ-specific: kidney via GSH-conjugate genotoxic/cytotoxic metabolites; liver via PPARa (non-genotoxic).",
+      "monograph": "IARC Monographs Vol. 106 (2014)",
+      "iris": {
+        "osf": 0.052,
+        "iur": 4.1e-06,
+        "rfd": 0.0005,
+        "rfc": 0.0004,
+        "source": "IRIS 2011",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 0.001923,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "2,3,7,8-TCDD",
+      "casrn": "1746-01-6",
+      "iarc_group": "1",
+      "g": 0.083,
+      "p": 0.75,
+      "kc": [
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        0.5,
+        0,
+        1,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        8
+      ],
+      "mechanism": "Prototypical non-genotoxic, AhR receptor-mediated tumour promoter.",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": 130000.0,
+        "iur": 38.0,
+        "rfd": 7e-10,
+        "rfc": null,
+        "source": "CalEPA OEHHA (IRIS RfD 2012)",
+        "moa": "linear (OEHHA)"
+      },
+      "aed_pod_mgkgday": 7.692e-10,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "Aflatoxin B1",
+      "casrn": "1162-65-8",
+      "iarc_group": "1",
+      "g": 0.917,
+      "p": 0.083,
+      "kc": [
+        1,
+        1,
+        0.5,
+        0,
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "kc_strong": [
+        1,
+        2
+      ],
+      "mechanism": "Metabolically activated electrophilic genotoxin (8,9-epoxide; TP53 R249S signature).",
+      "monograph": "IARC Monographs Vol. 100F (2012)",
+      "iris": {
+        "osf": null,
+        "iur": null,
+        "rfd": null,
+        "rfc": null,
+        "source": "IRIS (OSF nonstandard - verify)",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": null,
+      "pod_basis": null
+    },
+    {
+      "name": "Arsenic (inorganic)",
+      "casrn": "7440-38-2",
+      "iarc_group": "1",
+      "g": 0.833,
+      "p": 0.667,
+      "kc": [
+        0,
+        0.5,
+        1,
+        1,
+        1,
+        0.5,
+        0,
+        0,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        3,
+        4,
+        5
+      ],
+      "mechanism": "Predominantly non-genotoxic: oxidative stress + DNA-repair inhibition + epigenetic dysregulation (co-mutagen).",
+      "monograph": "IARC Monographs Vol. 100C (2012)",
+      "iris": {
+        "osf": 1.5,
+        "iur": 0.0043,
+        "rfd": 0.0003,
+        "rfc": null,
+        "source": "IRIS 1998 (2025 oral update OSF~32)",
+        "moa": "linear"
+      },
+      "aed_pod_mgkgday": 6.667e-05,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "Cadmium",
+      "casrn": "7440-43-9",
+      "iarc_group": "1",
+      "g": 0.75,
+      "p": 0.417,
+      "kc": [
+        0,
+        0.5,
+        1,
+        0.5,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        3,
+        5
+      ],
+      "mechanism": "Indirect: oxidative stress + DNA-repair inhibition + deregulated proliferation/apoptosis; not a direct genotoxin.",
+      "monograph": "IARC Monographs Vol. 100C (2012)",
+      "iris": {
+        "osf": null,
+        "iur": 0.0018,
+        "rfd": 0.0005,
+        "rfc": null,
+        "source": "IRIS 1994",
+        "moa": "linear (inhalation)"
+      },
+      "aed_pod_mgkgday": 1.587e-05,
+      "pod_basis": "inhalation unit risk"
+    },
+    {
+      "name": "Hexavalent chromium [Cr(VI)]",
+      "casrn": "18540-29-9",
+      "iarc_group": "1",
+      "g": 1.0,
+      "p": 0.333,
+      "kc": [
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "mechanism": "Intracellular reduction to genotoxic Cr(V/IV) species: Cr-DNA adducts, strand breaks, genomic instability.",
+      "monograph": "IARC Monographs Vol. 100C (2012)",
+      "iris": {
+        "osf": 0.27,
+        "iur": 0.012,
+        "rfd": 0.003,
+        "rfc": 0.0001,
+        "source": "IRIS 2024 (oral)",
+        "moa": "mutagenic"
+      },
+      "aed_pod_mgkgday": 0.0003704,
+      "pod_basis": "oral slope factor"
+    },
+    {
+      "name": "Nickel compounds",
+      "casrn": "7440-02-0",
+      "iarc_group": "1",
+      "g": 0.833,
+      "p": 0.667,
+      "kc": [
+        0,
+        0.5,
+        1,
+        1,
+        1,
+        0.5,
+        0,
+        0.5,
+        0,
+        0
+      ],
+      "kc_strong": [
+        3,
+        4,
+        5
+      ],
+      "mechanism": "Predominantly epigenetic + oxidative + DNA-repair inhibition (hypoxia-mimetic); weak direct genotoxin.",
+      "monograph": "IARC Monographs Vol. 100C (2012)",
+      "iris": {
+        "osf": null,
+        "iur": 0.00024,
+        "rfd": null,
+        "rfc": null,
+        "source": "IRIS 1991 (Ni refinery dust)",
+        "moa": "linear"
+      },
+      "aed_pod_mgkgday": 0.000119,
+      "pod_basis": "inhalation unit risk"
+    },
+    {
+      "name": "PCB-126",
+      "casrn": "57465-28-8",
+      "iarc_group": "1",
+      "g": 0.083,
+      "p": 0.75,
+      "kc": [
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        0.5,
+        0,
+        1,
+        0,
+        0.5
+      ],
+      "kc_strong": [
+        8
+      ],
+      "mechanism": "Non-genotoxic, AhR receptor-mediated promoter (TCDD-like, most potent dioxin-like PCB).",
+      "monograph": "IARC Monographs Vol. 107 (2016)",
+      "iris": {
+        "osf": 13000.0,
+        "iur": 3.8,
+        "rfd": null,
+        "rfc": null,
+        "source": "CalEPA OEHHA (TEF 0.1 x TCDD)",
+        "moa": "linear"
+      },
+      "aed_pod_mgkgday": 7.692e-09,
+      "pod_basis": "oral slope factor"
+    }
+  ]
+}

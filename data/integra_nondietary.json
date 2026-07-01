@@ -1,0 +1,54 @@
+{
+  "period": 24,
+  "chemical": null,
+  "absorption_fraction": 0.5,
+  "k_absorption_rate": 0.1,
+  "exposure_timeslots_soil": [
+    1,
+    8
+  ],
+  "concentration_of_chemical_in_soil": [
+    0.2,
+    0.1
+  ],
+  "amount_of_soil_eaten": [
+    0.05,
+    0.02
+  ],
+  "exposure_timeslots_Ingestion_PCPs": [
+    2,
+    10
+  ],
+  "amount_of_product_ingested": [
+    0.001,
+    0.0005
+  ],
+  "concentration_of_chemical_into_product": [
+    100.0,
+    50.0
+  ],
+  "exposure_timeslots_mouthing": [
+    3,
+    11
+  ],
+  "release_rates": [
+    0.1,
+    0.05
+  ],
+  "surface_mouthed": [
+    10.0,
+    8.0
+  ],
+  "exposure_timeslots_dust": [
+    4,
+    12
+  ],
+  "concentration_of_chemical_in_dust": [
+    1.0,
+    0.5
+  ],
+  "amount_of_dust_eaten": [
+    0.02,
+    0.01
+  ]
+}

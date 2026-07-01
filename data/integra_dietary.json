@@ -1,0 +1,377 @@
+{
+  "AGE": 35,
+  "GENDER": 1,
+  "period": 48,
+  "chemical": null,
+  "absorption_fraction": 0.5,
+  "k_absorption_rate": 0.2,
+  "MASS_CONCENTRATION_ANIMAL_FATS": 0.001,
+  "ANIMAL_FATS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "ANIMAL_FATS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_CHEESE": 0.001,
+  "CHEESE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "CHEESE_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_EGGS": 0.001,
+  "EGGS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "EGGS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_FISH": 0.001,
+  "FISH_TIME_EATEN": [
+    1,
+    25
+  ],
+  "FISH_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_FRUITS": 0.001,
+  "FRUITS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "FRUITS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_MEAT": 0.001,
+  "MEAT_TIME_EATEN": [
+    1,
+    25
+  ],
+  "MEAT_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_MILK": 0.001,
+  "MILK_TIME_EATEN": [
+    1,
+    25
+  ],
+  "MILK_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_NUTS": 0.001,
+  "NUTS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "NUTS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_POTATOES": 0.001,
+  "POTATOES_TIME_EATEN": [
+    1,
+    25
+  ],
+  "POTATOES_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_POULTRY": 0.001,
+  "POULTRY_TIME_EATEN": [
+    1,
+    25
+  ],
+  "POULTRY_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_SAUCAGE": 0.001,
+  "SAUCAGE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SAUCAGE_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_VEG_OILS": 0.001,
+  "VEG_OILS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "VEG_OILS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_VEGETABLES": 0.001,
+  "VEGETABLES_TIME_EATEN": [
+    1,
+    25
+  ],
+  "VEGETABLES_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_YOGURT": 0.001,
+  "YOGURT_TIME_EATEN": [
+    1,
+    25
+  ],
+  "YOGURT_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_OTHER": 0.001,
+  "OTHER_TIME_EATEN": [
+    1,
+    25
+  ],
+  "OTHER_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_PASTA_RICE": 0.001,
+  "PASTA_RICE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "PASTA_RICE_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_CEREALS": 0.001,
+  "CEREALS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "CEREALS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_BREAKFAST_CEREALS": 0.001,
+  "BREAKFAST_CEREALS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BREAKFAST_CEREALS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_BREAD": 0.001,
+  "BREAD_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BREAD_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_BISCUITS_CRISPY_BREAD": 0.001,
+  "BISCUITS_CRISPY_BREAD_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BISCUITS_CRISPY_BREAD_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_CAKES_BUNS_PUDDINGS": 0.001,
+  "CAKES_BUNS_PUDDINGS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "CAKES_BUNS_PUDDINGS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_BAKERIES_SNACKS": 0.001,
+  "BAKERIES_SNACKS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BAKERIES_SNACKS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_CREAM": 0.001,
+  "CREAM_TIME_EATEN": [
+    1,
+    25
+  ],
+  "CREAM_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_ICE_CREAM": 0.001,
+  "ICE_CREAM_TIME_EATEN": [
+    1,
+    25
+  ],
+  "ICE_CREAM_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_SPREADS": 0.001,
+  "SPREADS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SPREADS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_PRESERVES_SUGAR": 0.001,
+  "PRESERVES_SUGAR_TIME_EATEN": [
+    1,
+    25
+  ],
+  "PRESERVES_SUGAR_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_CONFECTIONERY": 0.001,
+  "CONFECTIONERY_TIME_EATEN": [
+    1,
+    25
+  ],
+  "CONFECTIONERY_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_SPICES": 0.001,
+  "SPICES_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SPICES_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_SOUPS_SAUCES": 0.001,
+  "SOUPS_SAUCES_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SOUPS_SAUCES_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_JUICE": 0.001,
+  "JUICE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "JUICE_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_COFFEE": 0.001,
+  "COFFEE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "COFFEE_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_TEA": 0.001,
+  "TEA_TIME_EATEN": [
+    1,
+    25
+  ],
+  "TEA_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_SOFT_DRINKS": 0.001,
+  "SOFT_DRINKS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SOFT_DRINKS_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_BEER": 0.001,
+  "BEER_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BEER_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_WINE": 0.001,
+  "WINE_TIME_EATEN": [
+    1,
+    25
+  ],
+  "WINE_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_SPIRITS": 0.001,
+  "SPIRITS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "SPIRITS_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_TAP_WATER": 0.001,
+  "TAP_WATER_TIME_EATEN": [
+    1,
+    25
+  ],
+  "TAP_WATER_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_BOTTLED_WATER": 0.001,
+  "BOTTLED_WATER_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BOTTLED_WATER_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ],
+  "MASS_CONCENTRATION_COMMERCIAL_INFANT_FOOD": 0.001,
+  "COMMERCIAL_INFANT_FOOD_TIME_EATEN": [
+    1,
+    25
+  ],
+  "COMMERCIAL_INFANT_FOOD_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_INFANT_FORMULAS": 0.001,
+  "INFANT_FORMULAS_TIME_EATEN": [
+    1,
+    25
+  ],
+  "INFANT_FORMULAS_AMOUNT_EATEN": [
+    10.0,
+    10.0
+  ],
+  "MASS_CONCENTRATION_BREAST_MILK": 0.001,
+  "BREAST_MILK_TIME_EATEN": [
+    1,
+    25
+  ],
+  "BREAST_MILK_AMOUNT_EATEN": [
+    0.2,
+    0.2
+  ]
+}

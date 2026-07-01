@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: qeaon-connector
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: CTX_API_KEY          # EPA CTX key -- paste in the Render dashboard (kept secret)
+        sync: false
+      - key: INTEGRA_API_KEY      # INTEGRA X-API-Key -- paste in the Render dashboard (kept secret)
+        sync: false
+      - key: INTEGRA_BASE_URL     # AUTH INTEGRA platform
+        value: https://integra-dev.cheng.auth.gr
+      - key: ALLOW_ORIGINS        # app is served same-origin; "*" also allows other front-ends
+        value: "*"

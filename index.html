@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>q-eAON Carcinogenicity Decision Support</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#16212e; --panel2:#1c2a3a; --ink:#e7eef6; --muted:#9fb3c8;
+    --line:#28384a; --accent:#d7263d; --eaon:#d7263d; --static:#5b9bd5; --tsce:#7f8c8d;
+    --good:#2e9e5b; --warn:#e0a800; --chip:#223247;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;background:linear-gradient(180deg,#16212e,#101924)}
+  header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:12px}
+  .wrap{display:grid;grid-template-columns:380px 1fr;gap:0;min-height:calc(100vh - 56px)}
+  .controls{border-right:1px solid var(--line);padding:16px;overflow:auto;max-height:calc(100vh - 56px)}
+  .results{padding:18px 22px;overflow:auto;max-height:calc(100vh - 56px)}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:18px 0 8px;font-weight:650}
+  h2:first-child{margin-top:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .stressor{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+  .row label{font-size:11px;color:var(--muted);width:78px;flex:none}
+  input[type=text],input[type=number],select{background:#0e1722;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 7px;font-size:13px;width:100%}
+  input[type=range]{width:100%}
+  .mini{display:flex;gap:6px}
+  .mini > div{flex:1}
+  .mini label{display:block;font-size:10px;color:var(--muted);margin-bottom:2px}
+  button{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:7px 11px;font-size:13px;cursor:pointer}
+  button:hover{border-color:#3a5273}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;width:100%;padding:11px;font-size:14px}
+  button.ghost{background:transparent}
+  button.sm{padding:4px 8px;font-size:11px}
+  .presets{display:flex;flex-wrap:wrap;gap:6px}
+  .presets button{font-size:11.5px;padding:5px 9px}
+  .x{color:var(--muted);float:right;cursor:pointer;font-size:14px}
+  .bignum{display:flex;align-items:baseline;gap:10px;margin:4px 0 2px}
+  .bignum .v{font-size:40px;font-weight:700;color:var(--eaon)}
+  .bignum .ci{color:var(--muted);font-size:14px}
+  .cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .cmp .c{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px;text-align:center}
+  .cmp .c .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .cmp .c .num{font-size:24px;font-weight:700;margin-top:3px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  canvas{width:100%;display:block}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+  .note{font-size:11.5px;color:var(--muted)}
+  .disclaimer{background:#2a2410;border:1px solid #5a4d18;color:#e8d690;border-radius:8px;padding:9px 11px;font-size:11.5px;margin-bottom:14px}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-bottom:8px}
+  .tag{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  .pillbar{height:9px;border-radius:5px;background:#0e1722;overflow:hidden;display:flex}
+  .footwrap{font-size:11px;color:var(--muted);margin-top:8px}
+  .kpi{display:flex;gap:8px;align-items:center}
+  .savedrow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .kcpanel{margin-top:8px}
+  .kcpanel summary{font-size:11.5px;color:var(--accent)}
+  .kcnote{font-size:10.5px;color:var(--muted);margin:6px 0}
+  .kcrow{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 0;cursor:pointer}
+  .kcrow input{width:auto;margin:0}
+  .kcrow span{flex:1}
+  .kcrow em{font-style:normal;font-size:9.5px;color:#7d93aa;border:1px solid var(--line);border-radius:10px;padding:0 6px}
+  .kcrow em.both{color:#e0a86b;border-color:#5a4420}
+  .gp-auto{font-size:10px;color:var(--good)}
+</style>
+</head>
+<body>
+<header>
+  <div style="width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#d7263d,#7a1422)"></div>
+  <div>
+    <h1>q-eAON &mdash; Carcinogenicity Decision Support</h1>
+    <div class="sub">Evolutionary adverse-outcome-pathway network &middot; life-course malignant-transformation probability &middot; runs fully offline</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ============ CONTROLS ============ -->
+  <div class="controls">
+    <div class="disclaimer"><b>Research prototype.</b> Illustrative parameters anchored to bronchial single-cell data (Yoshida 2020) and lung-cancer epidemiology (Peto 2000). Not a validated regulatory instrument; outputs are model estimates with structural and parameter uncertainty.</div>
+
+    <h2>1 &middot; Exposure scenario</h2>
+    <div class="presets">
+      <button onclick="preset('never')">Never-exposed</button>
+      <button onclick="preset('cont')">Continuing smoker</button>
+      <button onclick="preset('quit')">Ex-smoker (quit 50)</button>
+      <button onclick="preset('mix')">Initiator + promoter</button>
+    </div>
+    <div id="stressors" style="margin-top:10px"></div>
+    <button class="ghost sm" onclick="addStressor()">+ add stressor</button>
+    <div class="card" style="margin-top:10px">
+      <div class="tag">Hazard auto-fill &mdash; GeneTox/IARC + ToxCast (optional)</div>
+      <div class="row" style="margin-top:8px"><label style="width:60px">Backend</label><input type="text" id="tcUrl" placeholder="leave blank if hosted; else http://localhost:8000"></div>
+      <div class="row"><label style="width:60px">Chemical</label><input type="text" id="tcQuery" placeholder="name, CAS, or DTXSID"></div>
+      <button class="sm" onclick="loadFromToxcast()">Load g/p from ToxCast &#9656;</button>
+      <div class="note" id="tcStatus" style="margin-top:6px">g from authoritative genotoxicity (EPA GeneTox / IARC); p from ToxCast/Tox21 bioactivity. Connector must be running.</div>
+    </div>
+
+    <h2>2 &middot; Host &amp; evaluation</h2>
+    <div class="card">
+      <div class="row"><label>Evaluate to age</label><input type="number" id="evalAge" value="75" min="20" max="90"></div>
+      <div class="row"><label>Susceptibility</label>
+        <select id="suscept">
+          <option value="1">Typical (×1.0)</option>
+          <option value="1.5">Elevated (×1.5)</option>
+          <option value="2.2">High (×2.2)</option>
+          <option value="0.6">Reduced (×0.6)</option>
+        </select>
+      </div>
+      <div class="note">Susceptibility scales the host selection landscape (baseline selection &amp; establishment).</div>
+    </div>
+
+    <h2>3 &middot; Model parameters</h2>
+    <details>
+      <summary>Show / edit parameters &amp; uncertainty</summary>
+      <div class="card" id="params"></div>
+      <button class="ghost sm" onclick="resetParams()">reset to bronchial defaults</button>
+    </details>
+    <div class="row" style="margin-top:8px"><label>MC samples</label><input type="number" id="mcN" value="300" min="0" max="2000" step="50"></div>
+    <div class="note">Monte-Carlo draws over parameter priors give a 90% credible interval. Set 0 to disable.</div>
+
+    <button class="primary" style="margin-top:14px" onclick="run()">Run assessment ▸</button>
+
+    <h2>4 &middot; Compare alternatives (SSbD)</h2>
+    <div class="card">
+      <div class="row" style="gap:6px">
+        <button class="sm" onclick="saveScenario('A')">Save as A</button>
+        <button class="sm" onclick="saveScenario('B')">Save as B</button>
+        <button class="sm ghost" onclick="clearSaved()">clear</button>
+      </div>
+      <div id="saved"></div>
+    </div>
+
+    <button class="ghost sm" onclick="exportReport()">⤓ export report (JSON)</button>
+  </div>
+
+  <!-- ============ RESULTS ============ -->
+  <div class="results" id="results">
+    <div class="card">
+      <div class="tag">Life-course malignant-transformation probability (eAON)</div>
+      <div class="bignum"><div class="v" id="riskMain">—</div><div class="ci" id="riskCI"></div></div>
+      <div class="note" id="riskSub">Configure a scenario and press <b>Run assessment</b>.</div>
+      <div class="cmp">
+        <div class="c"><div class="lab">eAON</div><div class="num" id="cEaon" style="color:var(--eaon)">—</div></div>
+        <div class="c"><div class="lab">Static AOP (tox.)</div><div class="num" id="cStatic" style="color:var(--static)">—</div></div>
+        <div class="c"><div class="lab">TSCE limit</div><div class="num" id="cTsce" style="color:var(--tsce)">—</div></div>
+      </div>
+      <div class="footwrap" id="cmpNote"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">Initiated field φ(t)</div>
+        <canvas id="phiCanvas" height="220"></canvas>
+        <div class="legend"><span><i style="background:var(--eaon)"></i>eAON</span><span><i style="background:var(--static)"></i>static</span><span class="note">shaded = exposure window</span></div>
+      </div>
+      <div class="card">
+        <div class="tag">Cumulative risk vs age</div>
+        <canvas id="riskCanvas" height="220"></canvas>
+        <div class="legend"><span><i style="background:var(--eaon)"></i>eAON</span><span><i style="background:var(--static)"></i>static</span><span><i style="background:var(--tsce)"></i>TSCE</span></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">Mixture apportionment (Shapley)</div>
+        <canvas id="shapCanvas" height="200"></canvas>
+        <div class="note" id="shapNote">Order-independent attribution of risk above background to each stressor.</div>
+      </div>
+      <div class="card">
+        <div class="tag">Uncertainty distribution (Monte-Carlo)</div>
+        <canvas id="mcCanvas" height="200"></canvas>
+        <div class="note" id="mcNote"></div>
+      </div>
+    </div>
+
+    <div class="card" id="cmpCard" style="display:none">
+      <div class="tag">Alternatives comparison</div>
+      <div id="cmpTable"></div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Model definition &amp; provenance</summary>
+        <div class="note" style="line-height:1.6;margin-top:8px">
+          The initiated-field fraction φ evolves as <b>dφ/dt = μ₀·m(t)·(1−φ) + s(t)·φ(1−φ) − ρ(t)·φ</b>, with malignant hazard <b>h(t)=c·φ·m(t)·gate(t)</b> and life-course risk <b>1−exp(−∫h dt)</b>.
+          Genotoxic stressor weight raises the mutation multiplier m(t); promoter weight raises the selection coefficient s(t) and establishment gate(t); repopulation ρ acts after exposure ceases (near-normal clones outcompete damaged field).
+          The <b>static AOP</b> comparator freezes the selection layer (s=S₀, gate=1, ρ=0): the genotoxic-MIE toxicological reading. The <b>TSCE limit</b> is the constant-rate two-stage model (no exposome schedule, no repopulation) to which the eAON reduces — see manuscript §6.4.
+          Defaults: μ₀, s, ρ anchored to Yoshida (2020) bronchial driver fractions; c, gate calibrated to never-/continuing-smoker lifetime risk (Peto 2000).
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================ MODEL CORE ============================
+const DEFAULTS={mu0:9.64e-4, RMU:4.6, S0:0.01, s_prom:0.0228, b_est:1.548, RHO0:0.113, c:1.178e-3};
+const PARAM_META=[
+  ['mu0','μ₀ baseline initiation /yr','Yoshida 2020 driver fraction (never-smoker)'],
+  ['RMU','Rμ mutation multiplier (genotoxic)','Yoshida 2020 age-adj burden ratio'],
+  ['S0','S₀ baseline selection /yr','dN/dS>1 normal bronchus'],
+  ['s_prom','s_prom promoter selection /yr','calibrated to smoker driver fraction'],
+  ['b_est','b establishment promotion','calibrated to continuing-smoker risk'],
+  ['RHO0','ρ₀ post-cessation repopulation /yr','Yoshida 2020 near-normal recovery'],
+  ['c','c hazard scale /yr','calibrated to never-smoker 0.4%'],
+];
+let PARAMS={...DEFAULTS};
+let STRESSORS=[];
+let SAVED={};
+let LAST=null;
+const KCS=[
+ {n:'1. Electrophilic / metabolically activated', g:1.0, p:0},
+ {n:'2. Genotoxic', g:1.0, p:0},
+ {n:'3. Alters DNA repair / causes genomic instability', g:1.0, p:0},
+ {n:'4. Induces epigenetic alterations', g:0.5, p:0.5},
+ {n:'5. Induces oxidative stress', g:0.5, p:0.5},
+ {n:'6. Induces chronic inflammation', g:0, p:1.0},
+ {n:'7. Is immunosuppressive', g:0, p:1.0},
+ {n:'8. Modulates receptor-mediated effects', g:0, p:1.0},
+ {n:'9. Causes immortalisation', g:0, p:1.0},
+ {n:'10. Alters cell proliferation / death / nutrient supply', g:0, p:1.0},
+];
+const KC_DIV=3;   // ~3 strong characteristics in a channel saturate that channel
+function kcToGP(set){ let gs=0,ps=0; set.forEach(i=>{gs+=KCS[i].g;ps+=KCS[i].p;}); let g=Math.min(1,gs/KC_DIV), p=Math.min(1,ps/KC_DIV); const genotox=set.includes(1); if(genotox){ p=p*0.5; } else if(gs>0 && ps>0){ g=g*0.5; } return {g:+g.toFixed(2), p:+p.toFixed(2)}; }  // mechanism-dominance: KC2 genotoxic -> initiation-dominant (halve p); non-genotoxic -> promotion-dominant (halve g)
+function kcChange(i){
+  const set=[]; for(let j=0;j<KCS.length;j++){ const cb=document.getElementById('kc_'+i+'_'+j); if(cb&&cb.checked)set.push(j); }
+  const gp=kcToGP(set); STRESSORS[i].kc=set; STRESSORS[i].g=+gp.g.toFixed(2); STRESSORS[i].p=+gp.p.toFixed(2);
+  const ge=document.getElementById('g_'+i), pe=document.getElementById('p_'+i); if(ge)ge.value=STRESSORS[i].g; if(pe)pe.value=STRESSORS[i].p;
+}
+
+// Dose-response: genotoxic (g) linear / no-threshold; promoter (p) saturating Hill,
+// normalised so the normalised dose x = 1 at the point of departure (POD).
+// Backward compatible: with no dose anchor, x = manual intensity and satG(1)=satP(1)=1.
+const PROM_HILL=2;                                  // >1 => threshold-like promoter
+function satG(x){ return Math.max(0,x); }           // linear, no threshold
+function satP(x){ const xh=Math.pow(Math.max(0,x),PROM_HILL); return 2*xh/(1+xh); }
+function xgOf(st){ return (st.dose>0 && st.aed_g>0)? st.dose/st.aed_g : st.intensity; }
+function xpOf(st){ return (st.dose>0 && st.aed_p>0)? st.dose/st.aed_p : st.intensity; }
+function activeIntensity(st,t){ return (t>=st.start && t<st.stop)? st.intensity : 0; }
+function rates(t,P,stressors,model,suscept){
+  let gen=0,prom=0,anyExp=0,everExp=0;
+  for(const st of stressors){
+    if(t>=st.start)everExp=1;
+    if(!(t>=st.start && t<st.stop)) continue;
+    anyExp=1;
+    gen += st.g*satG(xgOf(st));
+    prom += st.p*satP(xpOf(st));
+  }
+  const m=1+(P.RMU-1)*gen;
+  let s,rho,gate;
+  if(model==='eaon'){ s=(P.S0+P.s_prom*prom)*suscept; gate=1+P.b_est*prom*suscept; rho=(everExp&&!anyExp)?P.RHO0:0; }
+  else if(model==='tsce'){ s=P.S0; gate=1; rho=0; } // constant-rate two-stage (genotoxic m still applies)
+  else { s=P.S0*suscept; gate=1; rho=0; } // static toxicological reading
+  return {m,s,rho,gate};
+}
+function simulate(P,stressors,model,T,suscept,wantTraj){
+  const dt=0.1; let phi=0,cum=0; const traj=[]; const riskByAge=[];
+  const clamp=x=>Math.min(1,Math.max(0,x));
+  for(let t=0;t<T+1e-9;t+=dt){
+    if(wantTraj && Math.abs((t%1))<dt/2){ traj.push({t,phi}); riskByAge.push({t,r:1-Math.exp(-cum)}); }
+    const f=(tt,ph)=>{const r=rates(tt,P,stressors,model,suscept);return [r.m*P.mu0*(1-ph)+r.s*ph*(1-ph)-r.rho*ph, P.c*ph*r.m*r.gate];};
+    const k1=f(t,phi),k2=f(t+dt/2,clamp(phi+dt/2*k1[0])),k3=f(t+dt/2,clamp(phi+dt/2*k2[0])),k4=f(t+dt,clamp(phi+dt*k3[0]));
+    phi=clamp(phi+dt/6*(k1[0]+2*k2[0]+2*k3[0]+k4[0]));
+    cum+=dt/6*(k1[1]+2*k2[1]+2*k3[1]+k4[1]);
+  }
+  return {risk:1-Math.exp(-cum), phi, traj, riskByAge};
+}
+function lognormalSample(mean,cv){ const sigma=Math.sqrt(Math.log(1+cv*cv)); const mu=Math.log(mean)-sigma*sigma/2; let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); const z=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); return Math.exp(mu+sigma*z); }
+function monteCarlo(stressors,T,suscept,N,cv){
+  if(N<=0) return null; const out=[];
+  for(let i=0;i<N;i++){ const P={}; for(const k in PARAMS) P[k]=lognormalSample(PARAMS[k],cv); out.push(simulate(P,stressors,'eaon',T,suscept,false).risk); }
+  out.sort((a,b)=>a-b);
+  const q=p=>out[Math.min(out.length-1,Math.max(0,Math.floor(p*out.length)))];
+  return {p5:q(0.05),p50:q(0.5),p95:q(0.95),samples:out};
+}
+function factorial(k){let r=1;for(let i=2;i<=k;i++)r*=i;return r;}
+function shapley(stressors,T,suscept){
+  const n=stressors.length; if(n===0) return [];
+  const subs=[]; for(let msk=0;msk<(1<<n);msk++){const s=[];for(let i=0;i<n;i++)if(msk&(1<<i))s.push(i);subs.push(s);}
+  const key=s=>s.slice().sort((a,b)=>a-b).join(',');
+  const v={}; subs.forEach(s=>{ v[key(s)]=simulate(PARAMS,stressors.filter((x,i)=>s.includes(i)),'eaon',T,suscept,false).risk; });
+  return [...Array(n).keys()].map(i=>{ let val=0; subs.forEach(s=>{ if(!s.includes(i)){ const w=factorial(s.length)*factorial(n-s.length-1)/factorial(n); val+=w*(v[key([...s,i])]-v[key(s)]); } }); return val; });
+}
+
+// ============================ UI ============================
+function integraPanel(s,i){
+  if(s._smoking) return '';   // INTEGRA is not meaningful for smoking
+  return `
+      <details class="kcpanel"${s._exopen?' open':''} ontoggle="STRESSORS[${i}]._exopen=this.open"><summary>Exposure scenario (INTEGRA)</summary>
+        <div class="kcnote">Mechanistic aggregate exposure &rarr; mean daily dose via INTEGRA (AUTH). Enter any concentrations; the connector (with an INTEGRA key) computes the dose and fills it above.</div>
+        <div class="mini">
+          <div><label>body weight (kg)</label><input type="number" step="any" value="${s.ibw!=null?s.ibw:70}" onchange="STRESSORS[${i}].ibw=+this.value"></div>
+          <div><label>diet conc (&micro;g/g)</label><input type="number" step="any" value="${s.ifc!=null?s.ifc:''}" placeholder="optional" onchange="STRESSORS[${i}].ifc=this.value===''?null:+this.value"></div>
+        </div>
+        <div class="mini" style="margin-top:6px">
+          <div><label>air conc (&micro;g/m&sup3;)</label><input type="number" step="any" value="${s.iac!=null?s.iac:''}" placeholder="optional" onchange="STRESSORS[${i}].iac=this.value===''?null:+this.value"></div>
+          <div><label>soil/dust (&micro;g/g)</label><input type="number" step="any" value="${s.isc!=null?s.isc:''}" placeholder="optional" onchange="STRESSORS[${i}].isc=this.value===''?null:+this.value"></div>
+        </div>
+        <button class="sm" style="margin-top:6px" onclick="integraCompute(${i})">Compute exposure &rarr; dose</button>
+        <div class="note" id="ires_${i}" style="margin-top:6px">${s._ires||''}</div>
+      </details>`;
+}
+function renderStressors(){
+  const el=document.getElementById('stressors'); el.innerHTML='';
+  STRESSORS.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='stressor';
+    d.innerHTML=`<span class="x" onclick="rmStressor(${i})">✕</span>
+      <div class="row"><label>Name</label><input type="text" value="${s.name}" onchange="upd(${i},'name',this.value)"></div>
+      <div class="mini">
+        <div><label>start age</label><input type="number" value="${s.start}" onchange="upd(${i},'start',+this.value)"></div>
+        <div><label>stop age</label><input type="number" value="${s.stop>=900?'':s.stop}" placeholder="never" onchange="upd(${i},'stop',this.value===''?999:+this.value)"></div>
+        <div><label>intensity</label><input type="number" step="0.1" value="${s.intensity}" onchange="upd(${i},'intensity',+this.value)"></div>
+      </div>
+      <div class="mini" style="margin-top:6px">
+        <div><label>mean daily dose (mg/kg·d)</label><input type="number" step="any" min="0" value="${(s.dose!=null)?s.dose:''}" placeholder="optional" onchange="upd(${i},'dose',this.value===''?null:+this.value); renderStressors(); run();">${s.exp>0?`<button class="ghost sm" style="margin-top:4px" onclick="upd(${i},'dose',${s.exp}); renderStressors(); run();">use pop. exposure</button>`:''}</div>
+        <div style="grid-column:1 / span 2"><label>dose anchor</label><div class="note" style="padding-top:6px;line-height:1.35">${doseNote(s)}</div></div>
+      </div>
+      <div class="mini" style="margin-top:6px">
+        <div><label>genotoxic g (0–1)</label><input id="g_${i}" type="number" step="0.05" min="0" max="1" value="${(+s.g).toFixed(2)}" onchange="upd(${i},'g',+this.value)"></div>
+        <div><label>promoter p (0–1)</label><input id="p_${i}" type="number" step="0.05" min="0" max="1" value="${(+s.p).toFixed(2)}" onchange="upd(${i},'p',+this.value)"></div>
+      </div>
+      <details class="kcpanel"${s._kcopen?' open':''} ontoggle="STRESSORS[${i}]._kcopen=this.open"><summary>⚙ Score from key characteristics (IARC)</summary>
+        <div class="kcnote">Tick the carcinogen key characteristics with mechanistic evidence; g and p are computed automatically. <b>var</b> = generates heritable variation → g; <b>sel</b> = alters selective value → p; <b>both</b> = contributes to each.</div>
+        ${KCS.map((k,j)=>`<label class="kcrow"><input type="checkbox" ${(s.kc||[]).includes(j)?'checked':''} id="kc_${i}_${j}" onchange="kcChange(${i})"><span>${k.n}</span><em class="${k.g&&k.p?'both':''}">${k.g&&k.p?'both':(k.g?'var':'sel')}</em></label>`).join('')}
+      </details>
+      ${integraPanel(s,i)}
+`;
+    el.appendChild(d);
+  });
+}
+function upd(i,k,v){ STRESSORS[i][k]=v; }
+function fmtd(x){ return (x==null)?'?':(x>=100?(+x).toFixed(0):x>=1?(+x).toFixed(2):(+x).toPrecision(2)); }
+function doseNote(s){
+  if(s.aed_g>0 || s.aed_p>0){
+    let t='intensity 1 = POD. AED: g '+fmtd(s.aed_g)+', p '+fmtd(s.aed_p)+' mg/kg·d';
+    if(s.dose>0){ const xg=s.aed_g? fmtd(s.dose/s.aed_g):'n/a', xp=s.aed_p? fmtd(s.dose/s.aed_p):'n/a';
+      t+=' → x_g='+xg+', x_p='+xp+' <b>(dose drives intensity)</b>'; }
+    else t+=' — enter a dose above to drive intensity';
+    if(s.exp>0){ t+='<br>SEEM population exposure ≈ '+fmtd(s.exp)+' mg/kg·d'+(s.ber?(' · BER ≈ '+fmtd(s.ber)+' (higher = ample margin)'):''); }
+    return t;
+  }
+  if(s.pod_g_uM>0 || s.pod_p_uM>0)
+    return 'POD (internal): g '+fmtd(s.pod_g_uM)+', p '+fmtd(s.pod_p_uM)+' µM. No httk C<sub>ss</sub> → external-dose anchor unavailable; using manual intensity.';
+  return 'No dose anchor — using manual intensity (x = dose/POD). Load a chemical from the hazard DB to attach a POD.';
+}
+function addStressor(){ STRESSORS.push({name:'stressor '+(STRESSORS.length+1),start:0,stop:999,intensity:1,g:0.5,p:0.5}); renderStressors(); }
+function rmStressor(i){ STRESSORS.splice(i,1); renderStressors(); }
+function preset(k){
+  if(k==='never') STRESSORS=[];
+  if(k==='cont') STRESSORS=[{name:'tobacco smoke',start:20,stop:999,intensity:1,g:1,p:1,_smoking:true}];
+  if(k==='quit') STRESSORS=[{name:'tobacco smoke',start:20,stop:50,intensity:1,g:1,p:1,_smoking:true}];
+  if(k==='mix') STRESSORS=[{name:'genotoxic initiator',start:0,stop:50,intensity:1,g:1,p:0},{name:'non-genotoxic promoter',start:0,stop:50,intensity:1,g:0,p:1}];
+  renderStressors(); run();
+}
+function renderParams(){
+  const el=document.getElementById('params'); el.innerHTML='';
+  PARAM_META.forEach(([k,lab,src])=>{
+    const r=document.createElement('div'); r.className='row';
+    r.innerHTML=`<label title="${src}" style="width:150px">${lab}</label><input type="number" step="any" value="${PARAMS[k]}" onchange="PARAMS['${k}']=+this.value">`;
+    el.appendChild(r);
+  });
+  const cv=document.createElement('div'); cv.className='row';
+  cv.innerHTML=`<label style="width:150px">prior CV (uncertainty)</label><input type="number" step="0.05" value="${PARAMS._cv||0.25}" onchange="PARAMS._cv=+this.value">`;
+  el.appendChild(cv);
+}
+function resetParams(){ PARAMS={...DEFAULTS,_cv:0.25}; renderParams(); }
+
+function fmtPct(x){ return (x*100).toFixed(x<0.001?3:(x<0.1?2:1))+'%'; }
+
+function run(){
+  const T=+document.getElementById('evalAge').value;
+  const suscept=+document.getElementById('suscept').value;
+  const N=+document.getElementById('mcN').value;
+  const cv=PARAMS._cv||0.25;
+  const eaon=simulate(PARAMS,STRESSORS,'eaon',T,suscept,true);
+  const stat=simulate(PARAMS,STRESSORS,'static',T,suscept,true);
+  const tsce=simulate(PARAMS,STRESSORS,'tsce',T,suscept,true);
+  const mc=monteCarlo(STRESSORS,T,suscept,N,cv);
+  const sh=shapley(STRESSORS,T,suscept);
+  const bg=simulate(PARAMS,[],'eaon',T,suscept,false).risk;
+  LAST={T,suscept,eaon,stat,tsce,mc,sh,bg,stressors:JSON.parse(JSON.stringify(STRESSORS)),params:{...PARAMS}};
+
+  document.getElementById('riskMain').textContent=fmtPct(eaon.risk);
+  document.getElementById('riskCI').textContent=mc?`90% CI ${fmtPct(mc.p5)} – ${fmtPct(mc.p95)}`:'';
+  const ratio=stat.risk>0?(eaon.risk/stat.risk):0;
+  document.getElementById('riskSub').innerHTML=`Background (no exposure): <b>${fmtPct(bg)}</b>. The eAON estimate is <b>${ratio.toFixed(1)}×</b> the static toxicological reading.`;
+  document.getElementById('cEaon').textContent=fmtPct(eaon.risk);
+  document.getElementById('cStatic').textContent=fmtPct(stat.risk);
+  document.getElementById('cTsce').textContent=fmtPct(tsce.risk);
+  document.getElementById('cmpNote').innerHTML = eaon.risk>stat.risk*1.2
+    ? 'The static (genotoxic-MIE) reading <b>under-estimates</b> risk because it cannot represent promotion / selection. The eAON captures it; the TSCE column shows the constant-rate two-stage value the eAON reduces to.'
+    : 'For a purely genotoxic exposure the three estimates converge — selection adds little, and the eAON reduces to two-stage theory.';
+
+  drawPhi(eaon,stat);
+  drawRisk(eaon,stat,tsce);
+  drawShapley(sh,bg);
+  drawMC(mc,eaon.risk);
+  renderSaved();
+}
+
+// ============================ CHARTS (canvas) ============================
+function setup(cv){ const c=document.getElementById(cv); const dpr=window.devicePixelRatio||1; const w=c.clientWidth||520; const h=c.dataset.h?+c.dataset.h:c.height; c.dataset.h=h; c.style.height=h+'px'; c.width=w*dpr; c.height=h*dpr; const x=c.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,w,h); return {x,w,h}; }
+function axes(x,w,h,xmax,ymax,xlab,ylab,ylabPct){
+  x.strokeStyle='#28384a';x.fillStyle='#9fb3c8';x.font='10px sans-serif';x.lineWidth=1;
+  const L=42,B=24,Tp=8,R=8;
+  x.beginPath();x.moveTo(L,Tp);x.lineTo(L,h-B);x.lineTo(w-R,h-B);x.stroke();
+  for(let i=0;i<=4;i++){ const yy=Tp+(h-B-Tp)*i/4; const val=ymax*(1-i/4); x.fillText(ylabPct?(val*100).toFixed(val<0.1?1:0)+'%':val.toExponential(0),2,yy+3); x.strokeStyle='#1c2a3a';x.beginPath();x.moveTo(L,yy);x.lineTo(w-R,yy);x.stroke(); }
+  for(let i=0;i<=4;i++){ const xx=L+(w-R-L)*i/4; x.fillText((xmax*i/4).toFixed(0),xx-5,h-B+13); }
+  x.fillStyle='#6b8299';x.fillText(xlab,(w)/2,h-2);
+  return {L,B,Tp,R, px:t=>L+(w-R-L)*t/xmax, py:v=>Tp+(h-B-Tp)*(1-v/ymax)};
+}
+function drawPhi(eaon,stat){
+  const {x,w,h}=setup('phiCanvas'); const ymax=Math.max(0.05,...eaon.traj.map(p=>p.phi),...stat.traj.map(p=>p.phi))*1.15;
+  const T=LAST.T; const A=axes(x,w,h,T,ymax,'age (years)','φ',false);
+  // exposure shading
+  x.fillStyle='rgba(215,38,61,0.07)';
+  LAST.stressors.forEach(s=>{ const x0=A.px(s.start),x1=A.px(Math.min(s.stop,T)); x.fillRect(x0,A.Tp,x1-x0,h-A.B-A.Tp); });
+  const line=(tr,col)=>{ x.strokeStyle=col;x.lineWidth=2;x.beginPath();tr.forEach((p,i)=>{const X=A.px(p.t),Y=A.py(p.phi);i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke(); };
+  line(stat.traj,'#5b9bd5'); line(eaon.traj,'#d7263d');
+}
+function drawRisk(eaon,stat,tsce){
+  const {x,w,h}=setup('riskCanvas'); const ymax=Math.max(0.01,eaon.risk,stat.risk,tsce.risk)*1.2;
+  const T=LAST.T; const A=axes(x,w,h,T,ymax,'age (years)','risk',true);
+  const line=(tr,col)=>{ x.strokeStyle=col;x.lineWidth=2;x.beginPath();tr.forEach((p,i)=>{const X=A.px(p.t),Y=A.py(p.r);i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke(); };
+  line(tsce.riskByAge,'#7f8c8d'); line(stat.riskByAge,'#5b9bd5'); line(eaon.riskByAge,'#d7263d');
+}
+function drawShapley(sh,bg){
+  const items=[{n:'background',v:bg,c:'#3a4a5c'},...LAST.stressors.map((s,i)=>({n:s.name,v:sh[i],c:i%2?'#d7263d':'#e0793f'}))];
+  const Tp=10,bh=28,gap=6,pad=12;
+  // grow the canvas so every stressor fits (no clipping beyond 5-6 bars)
+  const cv=document.getElementById('shapCanvas');
+  const need=Math.max(200,Tp+items.length*(bh+gap)+pad);
+  cv.dataset.h=need;
+  const {x,w,h}=setup('shapCanvas');
+  const tot=items.reduce((a,b)=>a+Math.max(0,b.v),0)||1;
+  x.font='11px sans-serif';
+  items.forEach((it,i)=>{ const y=Tp+i*(bh+6); const bw=(w-110)*Math.max(0,it.v)/tot; x.fillStyle=it.c;x.fillRect(110,y,Math.max(1,bw),bh); x.fillStyle='#e7eef6';x.textAlign='right';x.fillText(it.n,104,y+bh/2+4); x.textAlign='left';x.fillStyle='#9fb3c8';x.fillText(fmtPct(it.v),112+bw,y+bh/2+4); });
+  x.textAlign='left';
+  document.getElementById('shapNote').innerHTML = LAST.stressors.length? `Shapley values are order-independent and additive: background + contributions = total risk (${fmtPct(LAST.eaon.risk)}).` : 'Add stressors to apportion mixture risk.';
+}
+function drawMC(mc,point){
+  const {x,w,h}=setup('mcCanvas');
+  if(!mc){ x.fillStyle='#9fb3c8';x.font='12px sans-serif';x.fillText('Monte-Carlo disabled (set MC samples > 0).',12,h/2); document.getElementById('mcNote').textContent=''; return; }
+  const s=mc.samples; const xmax=Math.max(...s)*1.05; const bins=24; const hist=new Array(bins).fill(0);
+  s.forEach(v=>{ const b=Math.min(bins-1,Math.floor(v/xmax*bins)); hist[b]++; });
+  const ymax=Math.max(...hist); const L=42,B=24,Tp=8,R=8;
+  x.fillStyle='#9fb3c8';x.font='10px sans-serif';
+  for(let i=0;i<=4;i++){ const xx=L+(w-R-L)*i/4; x.fillText((xmax*i/4*100).toFixed(1)+'%',xx-10,h-B+13); }
+  hist.forEach((c,i)=>{ const X=L+(w-R-L)*i/bins, bw=(w-R-L)/bins-1, Y=Tp+(h-B-Tp)*(1-c/ymax); x.fillStyle='#34557a';x.fillRect(X,Y,bw,h-B-Y); });
+  const px=v=>L+(w-R-L)*v/xmax;
+  [['#2e9e5b',mc.p5],['#e7eef6',mc.p50],['#e0a800',mc.p95]].forEach(([col,v])=>{ x.strokeStyle=col;x.lineWidth=1.5;x.beginPath();x.moveTo(px(v),Tp);x.lineTo(px(v),h-B);x.stroke(); });
+  document.getElementById('mcNote').innerHTML=`median <b>${fmtPct(mc.p50)}</b>, 90% CI ${fmtPct(mc.p5)}–${fmtPct(mc.p95)} (n=${s.length}).`;
+}
+
+// ============================ SCENARIOS / EXPORT ============================
+function saveScenario(slot){ if(!LAST){run();} SAVED[slot]={risk:LAST.eaon.risk,stat:LAST.stat.risk,stressors:LAST.stressors,T:LAST.T}; renderSaved(); renderCmp(); }
+function clearSaved(){ SAVED={}; renderSaved(); renderCmp(); }
+function renderSaved(){
+  const el=document.getElementById('saved'); el.innerHTML='';
+  Object.keys(SAVED).forEach(k=>{ const s=SAVED[k]; const names=s.stressors.map(z=>z.name).join(', ')||'no exposure';
+    const d=document.createElement('div'); d.className='savedrow'; d.innerHTML=`<span><b>${k}</b> · ${names}</span><span style="color:var(--eaon)">${fmtPct(s.risk)}</span>`; el.appendChild(d); });
+}
+function renderCmp(){
+  const keys=Object.keys(SAVED); const card=document.getElementById('cmpCard');
+  if(keys.length<1){ card.style.display='none'; return; } card.style.display='block';
+  let rows=keys.map(k=>{ const s=SAVED[k]; return `<tr><td>${k}: ${s.stressors.map(z=>z.name).join(', ')||'none'}</td><td>${fmtPct(s.risk)}</td><td>${fmtPct(s.stat)}</td></tr>`; }).join('');
+  let verdict='';
+  if(keys.includes('A')&&keys.includes('B')){ const ra=SAVED.A.risk,rb=SAVED.B.risk; const better=ra<rb?'A':'B'; const red=(1-Math.min(ra,rb)/Math.max(ra,rb))*100;
+    verdict=`<div class="footwrap">Substitution verdict: <b>option ${better}</b> lowers the life-course malignant-transformation probability by <b>${red.toFixed(0)}%</b> (${fmtPct(Math.max(ra,rb))} → ${fmtPct(Math.min(ra,rb))}).</div>`; }
+  document.getElementById('cmpTable').innerHTML=`<table><tr><th>Scenario</th><th>eAON</th><th>Static</th></tr>${rows}</table>${verdict}`;
+}
+function exportReport(){
+  if(!LAST){ run(); }
+  const rep={generated:new Date().toISOString(), model:'q-eAON decision-support prototype',
+    evaluation_age:LAST.T, susceptibility:LAST.suscept, parameters:LAST.params, stressors:LAST.stressors,
+    results:{eaon:LAST.eaon.risk, static_toxicological:LAST.stat.risk, tsce_limit:LAST.tsce.risk, background:LAST.bg,
+      monte_carlo:LAST.mc?{p5:LAST.mc.p5,median:LAST.mc.p50,p95:LAST.mc.p95}:null,
+      shapley:LAST.stressors.map((s,i)=>({stressor:s.name,contribution:LAST.sh[i]}))},
+    saved_scenarios:SAVED};
+  const blob=new Blob([JSON.stringify(rep,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='qeAON_report.json'; a.click();
+}
+
+async function integraCompute(i){
+  const s=STRESSORS[i];
+  const base=(document.getElementById("tcUrl").value||"").replace(/\/$/,"");
+  const res=document.getElementById('ires_'+i);
+  const models=[], scenarios={};
+  // blank Backend => same-origin (works when this page is served by the connector)
+  if(s.ifc!=null){ models.push("dietary"); scenarios.dietary={_food_conc_ug_g:s.ifc}; }
+  if(s.iac!=null){ models.push("inhalation"); scenarios.inhalation={_air_conc_ug_m3:s.iac}; }
+  if(s.isc!=null){ models.push("nondietary"); scenarios.nondietary={_soil_conc_ug_g:s.isc,_dust_conc_ug_g:s.isc}; }
+  if(!models.length){ if(res)res.textContent="Enter at least one concentration (diet, air, or soil/dust)."; return; }
+  if(res)res.textContent="Computing exposure via INTEGRA…";
+  try{
+    const r=await fetch(base+"/exposure/integra",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({models:models,bodyweight_kg:(s.ibw!=null?s.ibw:70),period_h:24,scenarios:scenarios})});
+    if(!r.ok){ if(res)res.textContent="Error "+r.status+": "+(await r.text()).slice(0,160); return; }
+    const d=await r.json();
+    s.dose=d.dose_mgkgday;
+    const pp=Object.entries(d.per_pathway_ugday||{}).map(([k,v])=>k+' '+(+v).toPrecision(3)).join(', ');
+    s._ires="Aggregate intake "+(+d.intake_ugday_total).toPrecision(3)+" &micro;g/day ("+pp+") &rarr; dose <b>"+(+d.dose_mgkgday).toPrecision(3)+"</b> mg/kg&middot;d. Filled above.";
+    STRESSORS[i]._exopen=true; renderStressors(); run();
+  }catch(e){ if(res)res.textContent="Network/CORS error: "+e.message+" — is the connector running with an INTEGRA key?"; }
+}
+
+function tcSaveUrl(){ try{ localStorage.setItem("qeaon_tc_url", document.getElementById("tcUrl").value); }catch(e){} }
+async function loadFromToxcast(){
+  const base=(document.getElementById("tcUrl").value||"").replace(/\/$/,"");
+  const q=(document.getElementById("tcQuery").value||"").trim();
+  const st=document.getElementById("tcStatus");
+  // blank Backend => same-origin (works when this page is served by the connector)
+  if(!q){ st.textContent="Enter a chemical name, CAS, or DTXSID."; return; }
+  st.textContent="Querying hazard databases…"; tcSaveUrl();
+  try{
+    const r=await fetch(base+"/gp?query="+encodeURIComponent(q));
+    if(!r.ok){ st.textContent="Error "+r.status+": "+(await r.text()).slice(0,140); return; }
+    const d=await r.json();
+    const conf=d.confidence||"medium";
+    const iarc=(d.cancer&&d.cancer.iarc)?d.cancer.iarc:"no IARC classification";
+    if(conf==="low"){
+      st.innerHTML="⚠ <b>"+(d.name||q)+"</b> ("+d.dtxsid+"): no authoritative genotoxicity record and only "+
+        d.n_active_assays+" active ToxCast assay(s) — evidence too sparse to trust. <b>Not added.</b><br>"+
+        "<span style='color:#f59e0b'>Score manually from IARC key characteristics or EPA IRIS.</span>";
+      return;
+    }
+    const kc=(d.kc||[]).filter(k=>k.active_assays>0).map(k=>k.kc-1);
+    const dz=d.dose||{};
+    STRESSORS.push({name:d.name||q, start:0, stop:999, intensity:1, g:d.g, p:d.p, kc:kc, _kcopen:true,
+      dose:null, aed_g:(dz.aed_pod_g_mgkgday||null), aed_p:(dz.aed_pod_p_mgkgday||null),
+      pod_g_uM:(dz.pod_g_uM||null), pod_p_uM:(dz.pod_p_uM||null),
+      aed_o:(dz.aed_pod_overall_mgkgday||null), exp:(dz.predicted_exposure_mgkgday||null), ber:(dz.ber||null)});
+    renderStressors(); run();
+    const cc={high:"#16a34a",medium:"#d97706",low:"#dc2626"}[conf]||"#888";
+    const tierLine=d.tier?("<span class='note'>"+d.tier+"</span><br>"):"";
+    const mechLine=d.mechanism?("<i style='color:#9fb3c8'>"+d.mechanism+"</i><br>"):"";
+    st.innerHTML="Loaded <b>"+(d.name||q)+"</b> ("+(d.dtxsid||d.casrn||"")+"):<br>"+tierLine+
+      "<b>g="+d.g+"</b> <span class='note'>["+(d.g_source||"")+"]</span><br>"+
+      "<b>p="+d.p+"</b> <span class='note'>["+(d.p_source||"")+"]</span><br>"+mechLine+
+      "IARC: "+iarc+" · confidence <b style='color:"+cc+"'>"+conf+"</b>. Added as a stressor — set its exposure window.";
+  }catch(e){ st.textContent="Network/CORS error: "+e.message+" — is the connector running and is this origin allowed (ALLOW_ORIGINS)?"; }
+}
+try{ const _u=localStorage.getItem("qeaon_tc_url"); }catch(e){}
+// init
+PARAMS._cv=0.25; renderParams(); preset('cont');
+try{ const u=localStorage.getItem("qeaon_tc_url"); if(u) document.getElementById("tcUrl").value=u; }catch(e){}
+window.addEventListener('resize',()=>{ if(LAST) run(); });
+</script>
+</body>
+</html>
+        
