@@ -1,0 +1,128 @@
+{
+  "_meta": {
+    "purpose": "Phase B per-tissue calibration table for the q-eAON field model. One parameter set per target tissue, so cross-organ mixtures are combined across independently-calibrated fields (Phase A partitions; Phase B calibrates). NOT yet wired into the runtime; values with status 'skeleton' are placeholders to be derived. Provenance carries the anchoring dataset + DOI for every calibrated value.",
+    "field_model": "d(phi)/dt = m*mu0*(1-phi) + s*phi*(1-phi) - rho*phi ; hazard h = c*phi*m*gate ; risk = 1-exp(-int h dt). m=1+(RMU-1)*gen ; s=S0+s_prom*prom ; gate=1+b_est*prom.",
+    "calibration_principle": "mu0,S0 <- normal-tissue somatic-mutation/clonal data (rate x stem-cell target size x driver fraction; dN/dS + clone sizes). c <- fit to tissue background age-specific incidence. s_prom,b_est,RHO0 <- tissue exposure-response/cessation cohort where one exists, else transfer lung ratios (flagged). RMU treated as tissue-invariant to first order.",
+    "version": "0.1-skeleton",
+    "curated": "2026-07 (q-eAON Phase B seed)"
+  },
+
+  "cross_tissue_references": {
+    "stem_cell_counts_division_rates": [
+      {"ref": "Tomasetti & Vogelstein 2015, Science 347:78", "doi": "10.1126/science.1260825"},
+      {"ref": "Tomasetti, Li & Vogelstein 2017, Science 355:1330", "doi": "10.1126/science.aaf9011"}
+    ],
+    "pan_tissue_mutation_atlases": [
+      {"ref": "Li et al. 2021, A body map of somatic mutagenesis in morphologically normal human tissues, Nature 597:398", "doi": "10.1038/s41586-021-03836-1"},
+      {"ref": "SMaHT Network 2025, Nature 643 (3 Jul 2025) — 19 tissues / 150 donors reference catalogue; NEW, monitor for per-tissue variant data releases", "doi": "10.1038/s41586-025-09096-7", "portal": "https://smaht.org"}
+    ],
+    "incidence_databases": [
+      {"ref": "SEER (NCI) — SEER*Explorer, Nov-2024 submission (released Apr-2025), age-specific rates through 2022", "url": "https://seer.cancer.gov/statistics-network/explorer/"},
+      {"ref": "GLOBOCAN 2022 / Bray et al. 2024, CA Cancer J Clin 74:229; IARC Cancer Today portal", "doi": "10.3322/caac.21834", "portal": "https://gco.iarc.who.int/today"}
+    ]
+  },
+
+  "tissues": [
+    {
+      "tissue": "lung",
+      "status": "calibrated",
+      "priority": "reference/template",
+      "tier1_chemicals": ["benzo[a]pyrene", "arsenic", "cadmium", "Cr(VI)", "nickel"],
+      "params": {"mu0": 9.64e-4, "RMU": 4.6, "S0": 0.01, "s_prom": 0.0228, "b_est": 1.548, "RHO0": 0.113, "c": 1.178e-3},
+      "provenance": {
+        "mu0_S0_RHO0": {"source": "Yoshida et al. 2020, Nature 578:266 (bronchial driver fractions, near-normal recovery)", "doi": "10.1038/s41586-020-1961-1"},
+        "single_cell_support": {"source": "Huang/Yoshida et al. 2022, Nat Genet 54:492 (single-cell bronchial mutations, ageing+smoking)", "doi": "10.1038/s41588-022-01035-w"},
+        "c_s_prom_b_est": {"source": "Peto et al. 2000, BMJ 321:323 (never-/continuing-/ex-smoker lung-cancer risk)", "doi": "10.1136/bmj.321.7257.323"}
+      },
+      "validation_target": {"desc": "asbestos x smoking and radon x smoking supra-additive lung-cancer interaction", "status": "check"}
+    },
+
+    {
+      "tissue": "haematopoietic",
+      "status": "calibrated (background field); promotion knobs transferred from lung (flagged)",
+      "priority": "1st (new)",
+      "note": "phi reinterpreted as clonal-haematopoiesis (CHIP) fraction; CHIP->AML is a documented two-stage-like progression. HSC target pool ~50,000-200,000 (Lee-Six 2018) anchors mu0 target size.",
+      "tier1_chemicals": ["benzene", "1,3-butadiene", "ethylene oxide"],
+      "params": {"mu0": 2.32e-4, "RMU": 4.6, "S0": 0.10, "s_prom": 0.0228, "b_est": 1.548, "RHO0": 0.113, "c": 1.99e-4},
+      "calibration": {
+        "date": "2026-07",
+        "S0": {"value": 0.10, "basis": "CHIP driver-clone fitness ~10%/yr (~10x lung's 0.01)", "source": "Watson et al. 2020, Science 367:1449 (10.1126/science.aay9333); Fabre et al. 2022, Nat Med 28:1548 (10.1038/s41591-022-01883-3)"},
+        "mu0": {"value": 2.32e-4, "basis": "fit so median onset = 70 yr", "source": "SEER AML median age at diagnosis 70"},
+        "c": {"value": 1.99e-4, "basis": "fit so lifetime AML risk = 0.5% to age 85", "source": "SEER AML Stat Facts 2021-2023, seer.cancer.gov/statfacts/html/amyl.html"},
+        "transferred_from_lung": ["RMU", "s_prom", "b_est", "RHO0"],
+        "transfer_flag": "promotion knobs REMAIN lung-transferred: benzene (g=1, genotoxic-dominant) does not constrain them. Constrain later from a pure promoter (liver aflatoxin x HBV).",
+        "benzene_exposure_response_finding": "Confronting the calibrated blood field with the Hayes 1997 / meta-analysis cohort (RR 1.64/1.90/2.62 for <40/40-100/>100 ppm-yr; 7.1 at >=25 ppm) shows the CURRENT LINEAR genotoxic channel (gen=x) OVERSHOOTS ~300x (predicts RR ~600-770 = near-certain leukemia at occupational dose). A SATURATING genotoxic response gen=Gmax*x/(x+x50) (~Gmax 2.4, x50 O(1e3)) reproduces the observed dose-response within ~1.5x across 25x of dose and tames ambient over-prediction (RR 1.37->1.04 at 3 ug/m3). This is a GLOBAL model-structure decision (affects high-dose behaviour of all chemicals/tissues; lung@x~1 and ambient minimally affected). Complementary to kappa-pin (kappa=vertical scale at anchor; saturation=shape away from anchor). See qeaon-recalibration/CALIB_HAEM_BENZENE_NOTE.md.",
+        "validation_age_shape": "cumulative cases vs SEER 18/22% @55, 37/38% @65, 65/64% @75 (85+ gap = competing mortality; not fit to shape)",
+        "phi_note": "phi ~72% @70, ~92% @85 -- higher than exome-VAF CHIP prevalence but consistent with near-universal clonal expansion by ultra-sensitive WGS (Mitchell 2022); phi magnitude sensitive to S0 (S0=0.05 -> phi(85)~40%)"
+      },
+      "anchors": {
+        "normal_tissue_mutation": [
+          {"role": "HSC population size + mutation rate (mu0, S0)", "source": "Lee-Six et al. 2018, Nature 561:473", "doi": "10.1038/s41586-018-0497-0"},
+          {"role": "clonal dynamics across lifespan + selection (S0, age-slope)", "source": "Mitchell et al. 2022, Nature 606:343", "doi": "10.1038/s41586-022-04786-y"}
+        ],
+        "incidence": {"role": "c (background level)", "source": "SEER*Explorer leukaemia (AML/ANLL) age-specific incidence", "url": "https://seer.cancer.gov/statistics-network/explorer/"},
+        "exposure_response": {"role": "s_prom/b_est + dose-response shape", "source": "Hayes et al. 1997, JNCI 89:1065 (benzene dose-related haematologic neoplasms, Chinese cohort); Linet et al. 2015, Int J Cancer 137:2184", "doi": "10.1093/jnci/89.14.1065"}
+      },
+      "validation_target": {"desc": "benzene nonlinear low-dose hematotoxicity (steeper slope at low dose)", "source": "Vlaanderen/Lan et al. 2023, Environ Int 178:108062", "doi": "10.1016/j.envint.2023.108062"}
+    },
+
+    {
+      "tissue": "liver",
+      "status": "calibrated (background, clean-room, promotion-limited); interaction PREDICTED",
+      "priority": "2nd (doubles as interaction-magnitude validation)",
+      "tier1_chemicals": ["vinyl chloride", "aflatoxin B1", "PCB-126"],
+      "params": {"mu0": 1e-5, "S0_g_expansion": 0.0149, "c": 0.0605, "s_prom": null, "b_est": null, "RHO0": null},
+      "calibration": {
+        "date": "2026-07",
+        "regime": "promotion-limited (HCC): low effective initiation, expansion-sensitive; clean-room uses a measured mutation multiplier m for genotoxins, not RMU",
+        "mu0": {"value": 1e-5, "basis": "implied HCC-driver fraction ~3e-7 of the 33 SNV/yr hepatocyte mutation load (passenger-dominated)", "source": "Brunner et al. 2019, Nature 574:538 (10.1038/s41586-019-1670-9)"},
+        "g_normal": {"value": 0.0149, "basis": "fit to sporadic HCC median onset ~68; quiescent liver, << blood 0.10", "source": "Brunner 2019 (limited normal clonal expansion); SEER HCC median age ~66"},
+        "c": {"value": 0.0605, "basis": "fit to sporadic (non-chronic-disease) normal-liver HCC lifetime ~0.3%", "source": "SEER/GLOBOCAN HCC (sporadic component of total ~1.5%)"},
+        "validation": "median onset 68 (SEER ~66); ~52% of lifetime risk by age 65; population-mix ~8% chronic-disease livers at 15% HCC reproduce SEER total ~1.5%; risk ceiling 99% (promotion-sensitive)",
+        "interaction_prediction": "aflatoxin x HBV multiplier 29x (HBV-carrier HCC 10%) .. 58x (25%), g_HBV pinned from HBV-carrier HCC epidemiology (no aflatoxin data) -> brackets JECFA 30x and combined ~60x. See liver_bg2.py / liver_predict.py / LIVER_INTERACTION_NOTE.md."
+      },
+      "anchors": {
+        "normal_tissue_mutation": {"role": "mu0, S0 (healthy + cirrhotic liver mutation/clonal dynamics)", "source": "Brunner et al. 2019, Nature 574:538", "doi": "10.1038/s41586-019-1670-9"},
+        "incidence": {"role": "c (background level; high in E-Asia/Africa)", "source": "GLOBOCAN 2022 liver; SEER*Explorer liver", "doi": "10.3322/caac.21834"},
+        "exposure_response": {"role": "s_prom/b_est + a landmark interaction", "source": "Aflatoxin x HBV, Qidong cohort (Ross/Qian/Groopman); review Kew 2003, Liver Int 23:405", "doi": "10.1111/j.1478-3231.2003.00869.x"}
+      },
+      "validation_target": {"desc": "aflatoxin B1 x HBV multiplicative synergy for HCC (AFB1-alone ~4x, HBV-alone ~5x, combined ~60x) — a direct test of the eAON initiator x promoter interaction magnitude", "status": "key"}
+    },
+
+    {
+      "tissue": "kidney",
+      "status": "skeleton",
+      "priority": "3rd",
+      "tier1_chemicals": ["trichloroethylene"],
+      "params": {"mu0": null, "RMU": 4.6, "S0": null, "s_prom": null, "b_est": null, "RHO0": null, "c": null},
+      "anchors": {
+        "normal_tissue_mutation": {"role": "sparse; use pan-tissue atlas", "source": "Li et al. 2021 body map / SMaHT 2025", "doi": "10.1038/s41586-021-03836-1"},
+        "incidence": {"role": "c", "source": "SEER*Explorer kidney", "url": "https://seer.cancer.gov/statistics-network/explorer/"},
+        "exposure_response": {"role": "s_prom/b_est", "source": "TCE renal-cell-carcinoma cohorts (IARC Monograph 106)"}
+      }
+    },
+
+    {
+      "tissue": "nasopharynx_UADT",
+      "status": "skeleton",
+      "priority": "3rd",
+      "note": "upper-aerodigestive; oesophageal normal-tissue data used as the best available proxy for selection dynamics.",
+      "tier1_chemicals": ["formaldehyde"],
+      "params": {"mu0": null, "RMU": 4.6, "S0": null, "s_prom": null, "b_est": null, "RHO0": null, "c": null},
+      "anchors": {
+        "normal_tissue_mutation": {"role": "selection proxy (dN/dS, clone sizes)", "source": "Martincorena et al. 2018, Science 362:911 (oesophagus)", "doi": "10.1126/science.aau3879"},
+        "incidence": {"role": "c", "source": "GLOBOCAN 2022 nasopharynx; SEER*Explorer", "doi": "10.3322/caac.21834"},
+        "exposure_response": {"role": "s_prom/b_est", "source": "formaldehyde nasopharyngeal-cancer cohorts (IARC Monograph 100F)"}
+      }
+    },
+
+    {
+      "tissue": "multi-site",
+      "status": "design-decision",
+      "priority": "special-case",
+      "note": "TCDD, PCB-126 are non-genotoxic promoters with no single target tissue. OPEN DECISION: apply as a promotion modifier across the other tissue fields, or hold as one aggregate field. Do not calibrate as a standalone tissue until this is decided.",
+      "tier1_chemicals": ["2,3,7,8-TCDD", "PCB-126"],
+      "params": {"mu0": null, "RMU": null, "S0": null, "s_prom": null, "b_est": null, "RHO0": null, "c": null}
+    }
+  ]
+}

@@ -13,6 +13,28 @@ from kc_mapping import KC, KC_DIV
 _DATA = os.path.join(os.path.dirname(__file__), "data", "iarc_kc.json")
 _INDEX = None   # built once: lookup key -> enriched entry
 
+# Phase-A target-tissue assignment (primary site with sufficient human evidence,
+# per the IARC Monograph cited in each entry). Used to partition stressors into
+# per-tissue fields so cross-organ mixtures combine independently instead of
+# sharing one field. Multi-site agents are tagged "multi-site" (handled as their
+# own field for now). CAS-keyed so it is independent of naming.
+TISSUE_BY_CAS = {
+    "71-43-2":     "haematopoietic",   # benzene -> AML/leukaemia (IARC 120)
+    "50-00-0":     "nasopharynx",      # formaldehyde -> nasopharynx (+leukaemia) (IARC 100F)
+    "50-32-8":     "lung",             # benzo[a]pyrene -> lung/skin (IARC 100F)
+    "75-01-4":     "liver",            # vinyl chloride -> liver angiosarcoma (IARC 100F)
+    "106-99-0":    "haematopoietic",   # 1,3-butadiene -> leukaemia/lymphoma (IARC 100F)
+    "75-21-8":     "haematopoietic",   # ethylene oxide -> lymphoid (IARC 100F)
+    "79-01-6":     "kidney",           # trichloroethylene -> kidney (IARC 106)
+    "1746-01-6":   "multi-site",       # 2,3,7,8-TCDD -> all-cancers promoter (IARC 100F)
+    "1162-65-8":   "liver",            # aflatoxin B1 -> liver (IARC 100F)
+    "7440-38-2":   "lung",             # inorganic arsenic -> lung (inhal.; also skin/bladder) (IARC 100C)
+    "7440-43-9":   "lung",             # cadmium -> lung (IARC 100C)
+    "18540-29-9":  "lung",             # Cr(VI) -> lung (IARC 100C)
+    "7440-02-0":   "lung",             # nickel compounds -> lung/nasal (IARC 100C)
+    "57465-28-8":  "liver",            # PCB-126 -> liver (dioxin-like) (IARC 107)
+}
+
 
 def _norm_cas(s):
     return (s or "").strip()
@@ -54,6 +76,7 @@ def _enrich(e):
         "mechanism": e.get("mechanism"), "kc": kc,
         "kc_strong": strong, "kc_some": some,
         "g": g, "p": p, "dominance": dominance,
+        "tissue": TISSUE_BY_CAS.get(_norm_cas(e.get("casrn")), "unspecified"),
         "source": f"IARC key characteristics (curated; {e.get('monograph','')})",
         "iris": e.get("iris"),
     }

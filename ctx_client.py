@@ -69,6 +69,31 @@ class CTXClient:
                 "preferredName": _first(hit, "preferredName", "searchValue", default=q),
                 "casrn": _first(hit, "casrn")}
 
+    async def structure_png(self, dtxsid: str):
+        """Return a 2D chemical-structure PNG (bytes) for a DTXSID, or None.
+        Tries the authenticated CTX Chemical API image endpoint first, then the
+        public DSSTox dashboard image (no key) as a fallback so structures still
+        render if the CTX key is unset."""
+        dtxsid = (dtxsid or "").strip()
+        if not dtxsid.upper().startswith("DTXSID"):
+            return None
+        attempts = [
+            (f"{self.base}/chemical/file/image/search/by-dtxsid/{dtxsid}",
+             {"x-api-key": self.key, "accept": "image/png"}),
+            (f"https://comptox.epa.gov/dashboard-api/ccdapp1/chemical-files/image/by-dtxsid/{dtxsid}",
+             {"accept": "image/png"}),
+        ]
+        async with httpx.AsyncClient(timeout=self.timeout) as c:
+            for url, headers in attempts:
+                try:
+                    r = await c.get(url, headers=headers)
+                    if r.status_code == 200 and r.content and \
+                       r.headers.get("content-type", "").startswith("image"):
+                        return r.content
+                except httpx.HTTPError:
+                    continue
+        return None
+
     async def bioactivity(self, dtxsid: str):
         """Per-assay hit-calls (detail endpoint) joined with assay target/gene
         annotations (assay catalog, cached). Only aeid + hitc are kept from the

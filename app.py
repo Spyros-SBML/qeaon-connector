@@ -13,17 +13,18 @@ from __future__ import annotations
 import os, pathlib
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import httpx
 
 _HERE = pathlib.Path(__file__).resolve().parent
 
 from ctx_client import CTXClient
+from aop_client import AOPClient
 from kc_mapping import aggregate, KC
 from hazard_map import genetox_to_g, classify_cancer, confidence
 from tier1 import lookup as tier1_lookup, iris_pod
 from integra_client import (IntegraClient, ENDPOINTS as INTEGRA_ENDPOINTS,
-    dietary_intake_ugday, inhalation_intake_ugday, nondietary_intake_ugday, dose_mgkgday)
+    dietary_intake_ugday, inhalation_intake_ugday, nondietary_intake_ugday, dose_mgkgday, sig)
 from pydantic import BaseModel
 from potency import channel_pods, pick_css, aed_from_pod, pick_seem, ber, _to_float as _tf
 
@@ -48,6 +49,49 @@ def index():
     if f.exists():
         return FileResponse(str(f))
     return {"service": "q-eAON connector", "health": "/health", "app": "index.html not bundled"}
+
+
+@app.get("/body_atlas.png")
+def body_atlas():
+    """Static anatomical atlas image for the target-organ body map (same-origin)."""
+    f = _HERE / "body_atlas.png"
+    if f.exists():
+        return FileResponse(str(f), media_type="image/png")
+    raise HTTPException(404, "body_atlas.png not bundled")
+
+
+def _trim_structure(png):
+    """Trim the black border frame that EPA/DSSTox structure PNGs carry (otherwise the
+    app's red recolour turns the frame red too). Iteratively crops any uniform-colour
+    border down to the molecule, then re-pads with a little white so lines aren't
+    edge-to-edge. Falls back to the raw bytes if Pillow is unavailable."""
+    try:
+        import io
+        from PIL import Image, ImageChops, ImageOps
+        im = Image.open(io.BytesIO(png)).convert("RGB")
+        for _ in range(3):
+            bg = im.getpixel((0, 0))
+            bbox = ImageChops.difference(im, Image.new("RGB", im.size, bg)).getbbox()
+            if not bbox or bbox == (0, 0, im.width, im.height):
+                break
+            im = im.crop(bbox)
+        im = ImageOps.expand(im, border=max(3, im.width // 18), fill=(255, 255, 255))
+        out = io.BytesIO(); im.save(out, "PNG")
+        return out.getvalue()
+    except Exception:
+        return png
+
+
+@app.get("/structure/{dtxsid}")
+async def structure(dtxsid: str):
+    """2D chemical-structure image (PNG) for the body-map nodes. Same-origin so the
+    browser <img> avoids CORS and the EPA key stays server-side. Cached 1 day.
+    The frame border is trimmed so the app's red recolour draws only the molecule."""
+    png = await CTXClient().structure_png(dtxsid)
+    if not png:
+        raise HTTPException(404, "no structure image for " + dtxsid)
+    return Response(content=_trim_structure(png), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 def _kc_array_from_weights(weights):
@@ -208,6 +252,29 @@ class IntegraReq(BaseModel):
     scenarios: dict = {}                # {model: {override fields}}
 
 
+_AOP_CACHE = {}
+
+@app.get("/aop")
+async def aop(query: str = Query(..., description="chemical name, CAS, or DTXSID")):
+    """Tier-0 AOP: resolve a chemical to AOP-Wiki adverse-outcome-pathway chain(s) and map
+    the events onto the q-eAON canonical KE ontology. Chains + citations are pulled live from
+    AOP-Wiki; the chemical->AOP pointer is an extensible seed (see aop_client.CAS_TO_AOPS)."""
+    if query in _AOP_CACHE:
+        return _AOP_CACHE[query]
+    dtxsid = casrn = name = None
+    try:
+        chem = await CTXClient().resolve(query)
+        dtxsid = chem.get("dtxsid"); casrn = chem.get("casrn"); name = chem.get("preferredName")
+    except Exception:
+        # allow a bare CAS to work without CTX (e.g. offline / no key)
+        if "-" in query and query.replace("-", "").isdigit():
+            casrn = query
+    res = await AOPClient().resolve(casrn=casrn, dtxsid=dtxsid, name=name)
+    res.update({"query": query, "name": name, "dtxsid": dtxsid, "casrn": casrn})
+    _AOP_CACHE[query] = res
+    return res
+
+
 @app.post("/exposure/integra")
 async def exposure_integra(req: IntegraReq):
     """Aggregate INTEGRA exposure -> mean daily dose (mg/kg/day) for a stressor.
@@ -240,8 +307,8 @@ async def exposure_integra(req: IntegraReq):
     dose = dose_mgkgday(total, req.bodyweight_kg)
     return {
         "models": req.models, "bodyweight_kg": req.bodyweight_kg,
-        "intake_ugday_total": round(total, 4), "dose_mgkgday": dose,
-        "per_pathway_ugday": {k: round(v, 4) for k, v in per.items()},
+        "intake_ugday_total": sig(total, 6), "dose_mgkgday": dose,
+        "per_pathway_ugday": {k: sig(v, 6) for k, v in per.items()},
         "multimedia_concentrations": multimedia,
         "provenance": "INTEGRA (AUTH) aggregate exposure to mean daily dose",
         "diagnostics": diagnostics,

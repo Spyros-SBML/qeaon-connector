@@ -303,11 +303,11 @@
       ],
       "mechanism": "Metabolically activated electrophilic genotoxin (8,9-epoxide; TP53 R249S signature).",
       "iris": {
-        "osf": null,
+        "osf": 7.5,
         "iur": null,
         "rfd": null,
         "rfc": null,
-        "source": "IRIS (OSF nonstandard - verify)",
+        "source": "JECFA 2016-derived (HBsAg-negative 0.01 cancers/1e5/yr per ng/kg/day, ~75-yr lifetime -> OSF ~7.5 per mg/kg/day -> POD 1.3e-5 mg/kg/day); HBsAg+ ~30x more potent",
         "moa": "mutagenic"
       }
     },
@@ -478,6 +478,40 @@
         "rfc": null,
         "source": "CalEPA OEHHA (TEF 0.1 x TCDD)",
         "moa": "linear"
+      }
+    },
+    {
+      "name": "1,4-Dioxane",
+      "casrn": "123-91-1",
+      "dtxsid": "DTXSID4020533",
+      "iarc_group": "2B",
+      "monograph": "IARC Monographs Vol. 71 (1999)",
+      "aliases": [
+        "1,4-dioxane",
+        "dioxane",
+        "p-dioxane",
+        "diethylene dioxide"
+      ],
+      "kc": [
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "mechanism": "Non-genotoxic hepatocarcinogen: CYP2E1-mediated metabolism, oxidative stress, cytotoxicity and sustained/regenerative proliferation (threshold-like, high-dose). Consistent with AOP 220.",
+      "iris": {
+        "osf": 0.1,
+        "iur": 5e-06,
+        "rfd": 0.03,
+        "rfc": null,
+        "source": "EPA IRIS 1,4-dioxane (2013), EPA/635/R-11/003F",
+        "moa": "non-mutagenic"
       }
     }
   ]

@@ -11,15 +11,28 @@ Design rules (non-negotiable, for regulatory defensibility):
   * Result is a DRAFT requiring human confirmation before it joins Tier 1.
   * The LLM never overrides an existing Tier-1 row.
 
-Two modes:
-  1. Manual (no key): prints the extraction prompt; run it in any grounded LLM
-     (e.g. Claude with web access), then `append` the reviewed JSON.
+The SAME grounded/cited/review-gated pattern also extracts CANCER POTENCY
+(oral slope factor / inhalation unit risk / RfD) and writes it to a chemical's
+`iris` block, which the connector's tier1.iris_pod() turns into the POD (the 1e-4
+risk-specific dose) that anchors the app's dose -> intensity conversion. This is
+how PODs are populated at scale for chemicals whose potency is not in EPA IRIS
+(e.g. aflatoxin, whose value comes from OEHHA/JECFA): the connector already
+auto-derives PODs for IRIS/CTX-covered chemicals; this agent fills the gaps, cited.
+
+Two modes (both KC and potency):
+  1. Manual (no key): prints the grounded prompt; run it in any grounded LLM
+     (e.g. Claude with web access), then commit the reviewed JSON.
   2. Automated (ANTHROPIC_API_KEY set): calls the API with web search to draft it.
 
 CLI:
-  python kc_agent.py prompt "vinyl bromide"        # print the grounded prompt
-  python kc_agent.py draft  "vinyl bromide"        # automated draft (needs key)
-  python kc_agent.py append reviewed_row.json      # validate + add to Tier 1
+  # key characteristics -> g/p
+  python kc_agent.py prompt  "vinyl bromide"          # print the grounded KC prompt
+  python kc_agent.py draft   "vinyl bromide"          # automated KC draft (needs key)
+  python kc_agent.py append  reviewed_kc.json         # validate + add KC row to Tier 1
+  # cancer potency -> POD
+  python kc_agent.py potency-prompt "aflatoxin b1"    # print the grounded potency prompt
+  python kc_agent.py potency-draft  "aflatoxin b1"    # automated potency draft (needs key)
+  python kc_agent.py set-potency reviewed_potency.json # validate + write iris block (=> POD)
 """
 from __future__ import annotations
 import json, os, sys
@@ -115,19 +128,145 @@ def append_to_tier1(row: dict, data_path=None):
     return entry["name"]
 
 
-def draft_with_anthropic(chemical: str, api_key=None):
-    """Automated draft using the Anthropic API with web search (best effort).
-    Returns the parsed JSON dict. Requires ANTHROPIC_API_KEY and network access."""
+# ======================================================================
+# Tier-2 CANCER-POTENCY extractor (feeds the POD table)
+# ----------------------------------------------------------------------
+# Same grounded, cited, review-gated pattern as the KC extractor, but it
+# fills the `iris` block {osf, iur, rfd, rfc} of a chemical's Tier-1 entry.
+# The connector's tier1.iris_pod() then turns that into the POD (the 1e-4
+# risk-specific dose) that anchors the app's dose -> intensity conversion.
+# ======================================================================
+
+POTENCY_PROMPT_TEMPLATE = """You are a cancer dose-response analyst. Extract the CANCER POTENCY parameters
+for the chemical below, to anchor its point-of-departure (the 1e-4 risk-specific dose).
+Use ONLY authoritative sources you can cite, in this order of preference:
+  1. US EPA IRIS            (oral slope factor OSF, inhalation unit risk IUR, RfD, RfC)
+  2. CalEPA / OEHHA         (cancer potency factors)
+  3. US ATSDR               (cancer potency / MRLs)
+  4. WHO JECFA / IARC        (quantitative potency)
+  5. Peer-reviewed derivation (ONLY if none of the above give a value)
+Do NOT use your own recollection as a value. Every number MUST carry a citation:
+source name + the exact value with its units + a URL or DOI. If no citable value
+exists for a parameter, return null for it.
+
+Report in these units (convert if the source differs, and state the conversion in the citation):
+  osf = oral slope factor,    (mg/kg-day)^-1
+  iur = inhalation unit risk, (ug/m3)^-1
+  rfd = reference dose,        mg/kg-day     (threshold surrogate; last resort)
+  rfc = reference concentration, mg/m3
+Flag any route- or host-status dependence (e.g. HBV+ vs HBV- for aflatoxin) in "notes".
+
+Chemical: {chemical}
+
+Return ONLY a JSON object with this exact schema (no prose outside it):
+{{
+  "name": "<preferred name>",
+  "casrn": "<CAS number or null>",
+  "iris": {{ "osf": <num|null>, "iur": <num|null>, "rfd": <num|null>, "rfc": <num|null>,
+             "source": "<primary source + year>", "moa": "<linear|mutagenic|threshold>" }},
+  "iris_citations": {{ "osf": "<source, value, URL/DOI>", "iur": "...", "rfd": "...", "rfc": "..." }},
+  "notes": "<route/host-status dependence or caveats, or ''>",
+  "review_status": "DRAFT - expert confirmation required"
+}}
+Prefer OSF, then IUR, then RfD. Be conservative and cite every non-null value."""
+
+# loose sanity bounds so a mis-typed exponent is caught (spans TCDD OSF 1.3e5 .. benzene IUR 7.8e-6)
+_POT_RANGE = {"osf": (1e-4, 1e7), "iur": (1e-9, 1e3), "rfd": (1e-9, 10.0), "rfc": (1e-6, 100.0)}
+_INH_FACTOR = 20.0 / 70.0 / 1000.0     # ug/m3 -> mg/kg/day (matches tier1.iris_pod)
+
+
+def build_potency_prompt(chemical: str) -> str:
+    return POTENCY_PROMPT_TEMPLATE.format(chemical=chemical)
+
+
+def compute_pod(iris: dict, risk: float = 1e-4):
+    """Mirror tier1.iris_pod: 1e-4 risk-specific dose (mg/kg/day). OSF > IUR > RfD."""
+    if not iris:
+        return None, None
+    osf, iur, rfd = iris.get("osf"), iris.get("iur"), iris.get("rfd")
+    if osf:
+        return risk / osf, "oral slope factor"
+    if iur:
+        return (risk / iur) * _INH_FACTOR, "inhalation unit risk"
+    if rfd:
+        return rfd, "RfD (threshold surrogate)"
+    return None, None
+
+
+def validate_potency(rec: dict):
+    """Raise ValueError unless the drafted potency record is safe to commit."""
+    if not rec.get("name"):
+        raise ValueError("missing 'name'")
+    if not rec.get("casrn") and not rec.get("dtxsid"):
+        raise ValueError("need a CAS or DTXSID to match the chemical")
+    iris = rec.get("iris") or {}
+    cites = rec.get("iris_citations") or {}
+    if not any(iris.get(k) for k in ("osf", "iur", "rfd")):
+        raise ValueError("no potency value (need at least one of osf / iur / rfd)")
+    for k, (lo, hi) in _POT_RANGE.items():
+        v = iris.get(k)
+        if v is None:
+            continue
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError(f"{k}={v!r} must be a positive number or null")
+        if not (lo <= v <= hi):
+            raise ValueError(f"{k}={v} outside plausible range {lo}..{hi} (check units/exponent)")
+        if not cites.get(k):
+            raise ValueError(f"{k}={v} has no citation in iris_citations")
+    return True
+
+
+def set_potency_in_tier1(rec: dict, data_path=None):
+    """Validate a reviewed potency record and write its `iris` block onto the matching
+    Tier-1 entry (by CAS, else name/alias). Returns (name, POD, basis).
+    The entry must already exist (its KC row supplies g/p); add the KC row first if not."""
+    data_path = data_path or os.path.join(os.path.dirname(__file__), "data", "iarc_kc.json")
+    validate_potency(rec)
+    db = json.load(open(data_path, encoding="utf-8"))
+    cas = (rec.get("casrn") or "").strip()
+    nm = (rec.get("name") or "").strip().lower()
+    target = None
+    for e in db["entries"]:
+        if cas and (e.get("casrn") or "").strip() == cas:
+            target = e; break
+        names = [e.get("name", "")] + e.get("aliases", [])
+        if nm and nm in [n.strip().lower() for n in names]:
+            target = e; break
+    if target is None:
+        raise ValueError(
+            f"'{rec.get('name')}' is not in Tier-1 yet. Add its KC row first "
+            f"(`python kc_agent.py append <kc_row.json>`), then set its potency.")
+    iris = {k: rec["iris"].get(k) for k in ("osf", "iur", "rfd", "rfc")}
+    iris["source"] = rec["iris"].get("source", "")
+    iris["moa"] = rec["iris"].get("moa", "")
+    target["iris"] = iris
+    target["iris_citations"] = rec.get("iris_citations", {})
+    if rec.get("notes"):
+        target["iris_notes"] = rec["notes"]
+    target["iris_review"] = rec.get("review_status", "set via kc_agent potency extractor")
+    json.dump(db, open(data_path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+    pod, basis = compute_pod(iris)
+    return target["name"], pod, basis
+
+
+def draft_potency_with_anthropic(chemical: str, api_key=None):
+    """Automated potency draft via the Anthropic API with web search (best effort)."""
+    return _draft_with_prompt(build_potency_prompt(chemical), chemical, api_key)
+
+
+def _draft_with_prompt(prompt: str, chemical: str, api_key=None):
+    """Shared Anthropic-API call with web search; extracts the JSON object from the reply.
+    Requires ANTHROPIC_API_KEY and network access."""
     api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise RuntimeError("No ANTHROPIC_API_KEY set - use manual mode: "
-                           "`python kc_agent.py prompt \"%s\"`" % chemical)
+        raise RuntimeError("No ANTHROPIC_API_KEY set - use manual mode "
+                           "(`prompt` / `potency-prompt`) for %r" % chemical)
     import httpx
     body = {
         "model": os.environ.get("KC_AGENT_MODEL", "claude-sonnet-4-6"),
         "max_tokens": 1500,
         "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 6}],
-        "messages": [{"role": "user", "content": build_prompt(chemical)}],
+        "messages": [{"role": "user", "content": prompt}],
     }
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
@@ -141,16 +280,31 @@ def draft_with_anthropic(chemical: str, api_key=None):
     return json.loads(text[s:e + 1])
 
 
+def draft_with_anthropic(chemical: str, api_key=None):
+    """Automated KC draft via the Anthropic API with web search (best effort)."""
+    return _draft_with_prompt(build_prompt(chemical), chemical, api_key)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3 and not (len(sys.argv) == 3 and sys.argv[1] == "append"):
+    args = sys.argv[1:]
+    if len(args) < 2:
         print(__doc__); sys.exit(0)
-    cmd = sys.argv[1]
+    cmd, arg = args[0], args[1]
     if cmd == "prompt":
-        print(build_prompt(sys.argv[2]))
+        print(build_prompt(arg))
     elif cmd == "draft":
-        print(json.dumps(draft_with_anthropic(sys.argv[2]), indent=2, ensure_ascii=False))
+        print(json.dumps(draft_with_anthropic(arg), indent=2, ensure_ascii=False))
     elif cmd == "append":
-        row = json.load(open(sys.argv[2], encoding="utf-8"))
-        print("Appended to Tier 1:", append_to_tier1(row))
+        print("Appended KC row to Tier 1:", append_to_tier1(json.load(open(arg, encoding="utf-8"))))
+    elif cmd == "potency-prompt":
+        print(build_potency_prompt(arg))
+    elif cmd == "potency-draft":
+        print(json.dumps(draft_potency_with_anthropic(arg), indent=2, ensure_ascii=False))
+    elif cmd == "set-potency":
+        nm, pod, basis = set_potency_in_tier1(json.load(open(arg, encoding="utf-8")))
+        print(f"Set potency for {nm}: POD = {pod:.4g} mg/kg/day ({basis})" if pod
+              else f"Set potency for {nm} (no numeric POD - only RfC?)")
     else:
-        print("commands: prompt <chem> | draft <chem> | append <row.json>")
+        print("commands:\n"
+              "  KC:      prompt <chem> | draft <chem> | append <kc_row.json>\n"
+              "  potency: potency-prompt <chem> | potency-draft <chem> | set-potency <potency_row.json>")

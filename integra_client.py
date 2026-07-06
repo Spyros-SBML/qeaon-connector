@@ -61,11 +61,32 @@ def _expand(model, overrides):
     ov = dict(overrides or {})
     out = {}
     if model == "dietary":
+        dp = default_payload("dietary")
+        # (legacy, deprecated) one concentration applied to every food group.
         fc = ov.pop("_food_conc_ug_g", None)
         if fc is not None:
-            for k in default_payload("dietary"):
+            for k in dp:
                 if k.startswith("MASS_CONCENTRATION_"):
                     out[k] = fc
+        # PER-FOOD concentration map {FOOD: ug/g}. When supplied we ZERO every food
+        # first (an unlisted food is uncontaminated), then set the ones given -- so
+        # the chemical is no longer assumed present in all foods at one concentration.
+        conc = ov.pop("_food_conc", None)
+        if conc is not None:
+            for k in dp:
+                if k.startswith("MASS_CONCENTRATION_"):
+                    out[k] = 0.0
+            for food, c in (conc or {}).items():
+                key = "MASS_CONCENTRATION_" + food
+                if key in dp and c is not None:
+                    out[key] = float(c)
+        # PER-FOOD daily consumption {FOOD: g/day}. TIME_EATEN=[1,25] over period=48h
+        # means two eating events per 48h, so AMOUNT_EATEN=[D,D] -> D g/day.
+        amt = ov.pop("_food_amount", None) or {}
+        for food, d in amt.items():
+            key = food + "_AMOUNT_EATEN"
+            if key in dp and d is not None:
+                out[key] = [float(d), float(d)]
     elif model == "inhalation":
         ac = ov.pop("_air_conc_ug_m3", None)
         if ac is not None:
@@ -181,10 +202,27 @@ def nondietary_intake_ugday(resp, period_h=24):
     return tot
 
 
+def sig(x, n=6):
+    """Round to n significant figures (NOT fixed decimals). Fixed-decimal rounding
+    floors ultra-low values to 0 -- e.g. round(8.6e-11, 10) and round(6e-6, 4) == 0 --
+    which wiped out dioxin-class intakes (food conc in pg/g -> dose ~1e-9..1e-12
+    mg/kg/day). Significant-figure rounding preserves value across all magnitudes."""
+    if x is None:
+        return None
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return None
+    if x == 0.0 or x != x or x in (float("inf"), float("-inf")):
+        return 0.0 if x == 0.0 else x
+    import math
+    return round(x, -int(math.floor(math.log10(abs(x)))) + (n - 1))
+
+
 def dose_mgkgday(intake_ugday, bodyweight_kg):
     if not bodyweight_kg:
         return None
-    return round(intake_ugday / 1000.0 / float(bodyweight_kg), 10)
+    return sig(intake_ugday / 1000.0 / float(bodyweight_kg), 6)
 
 
 class IntegraClient:

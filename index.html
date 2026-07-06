@@ -67,6 +67,8 @@
   .kcrow span{flex:1}
   .kcrow em{font-style:normal;font-size:9.5px;color:#7d93aa;border:1px solid var(--line);border-radius:10px;padding:0 6px}
   .kcrow em.both{color:#e0a86b;border-color:#5a4420}
+  .aontog button{background:#16212e;color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:10.5px;padding:2px 10px;margin-left:5px;cursor:pointer}
+  .aontog button.on{background:var(--accent);color:#0b1420;border-color:var(--accent);font-weight:700}
   .gp-auto{font-size:10px;color:var(--good)}
 </style>
 </head>
@@ -82,23 +84,19 @@
 <div class="wrap">
   <!-- ============ CONTROLS ============ -->
   <div class="controls">
-    <div class="disclaimer"><b>Research prototype.</b> Illustrative parameters anchored to bronchial single-cell data (Yoshida 2020) and lung-cancer epidemiology (Peto 2000). Not a validated regulatory instrument; outputs are model estimates with structural and parameter uncertainty.</div>
-
     <h2>1 &middot; Exposure scenario</h2>
     <div class="presets">
-      <button onclick="preset('never')">Never-exposed</button>
+      <button onclick="preset('never')">Never-smoker</button>
       <button onclick="preset('cont')">Continuing smoker</button>
       <button onclick="preset('quit')">Ex-smoker (quit 50)</button>
       <button onclick="preset('mix')">Initiator + promoter</button>
     </div>
     <div id="stressors" style="margin-top:10px"></div>
     <button class="ghost sm" onclick="addStressor()">+ add stressor</button>
-    <div class="card" style="margin-top:10px">
-      <div class="tag">Hazard auto-fill &mdash; GeneTox/IARC + ToxCast (optional)</div>
-      <div class="row" style="margin-top:8px"><label style="width:60px">Backend</label><input type="text" id="tcUrl" placeholder="leave blank if hosted; else http://localhost:8000"></div>
-      <div class="row"><label style="width:60px">Chemical</label><input type="text" id="tcQuery" placeholder="name, CAS, or DTXSID"></div>
-      <button class="sm" onclick="loadFromToxcast()">Load g/p from ToxCast &#9656;</button>
-      <div class="note" id="tcStatus" style="margin-top:6px">g from authoritative genotoxicity (EPA GeneTox / IARC); p from ToxCast/Tox21 bioactivity. Connector must be running.</div>
+    <div class="card" id="connCard" style="margin-top:10px">
+      <div class="tag">Connector (optional)</div>
+      <div class="row" style="margin-top:8px"><label style="width:60px">Backend</label><input type="text" id="tcUrl" placeholder="leave blank if hosted; else http://localhost:8000" onchange="tcSaveUrl()"></div>
+      <div class="note" style="margin-top:6px">Address of the q-eAON connector, used for both ToxCast/IARC g&middot;p auto-fill and INTEGRA exposure. Leave blank when this page is served by the connector. Each chemical has its own <b>&ldquo;Auto-fill g&middot;p&rdquo;</b> button in its tab.</div>
     </div>
 
     <h2>2 &middot; Host &amp; evaluation</h2>
@@ -112,7 +110,19 @@
           <option value="0.6">Reduced (×0.6)</option>
         </select>
       </div>
-      <div class="note">Susceptibility scales the host selection landscape (baseline selection &amp; establishment).</div>
+      <div class="row"><label>Risk scale</label>
+        <select id="riskMode" onchange="RISK_MODE=this.value; run();">
+          <option value="absolute">Absolute (IRIS-anchored)</option>
+          <option value="index">Mechanistic index (tobacco gain)</option>
+        </select>
+      </div>
+      <div class="row"><label>Tissue handling</label>
+        <select id="tissueMode" onchange="TISSUE_MODE=this.value; run();">
+          <option value="pertissue">Per-tissue — each chemical's target organ</option>
+          <option value="single">Single shared field</option>
+        </select>
+      </div>
+      <div class="note">Susceptibility scales the host selection landscape. <b>Absolute mode</b> re-scales each IRIS-anchored chemical so intensity = 1 (its 10⁻⁴ risk-specific dose) reports 10⁻⁴ excess risk. <b>Per-tissue fields</b> put each stressor in its own calibrated organ field (blood &amp; liver anchored to their biology; other tissues fall back to lung), so carcinogens in different organs no longer share one field.</div>
     </div>
 
     <h2>3 &middot; Model parameters</h2>
@@ -136,6 +146,18 @@
       <div id="saved"></div>
     </div>
 
+    <h2>5 &middot; Save &amp; load runs</h2>
+    <div class="card">
+      <div class="row" style="gap:6px">
+        <input type="text" id="runName" placeholder="name this run…" style="flex:1">
+        <button class="sm primary" onclick="saveRun()">Save run</button>
+        <button class="sm ghost" onclick="document.getElementById('runFile').click()" title="import a .qeaon.json file">⤒ Import</button>
+        <input type="file" id="runFile" accept=".json,application/json" style="display:none" onchange="importRun(event)">
+      </div>
+      <div id="runList" style="margin-top:8px"></div>
+      <div class="note" style="margin-top:6px">Saves the whole scenario — every stressor with its retrieved g&middot;p, key characteristics, DTXSID and dose, plus the evaluation settings — in this browser. <b>Load</b> one to keep playing with scenarios without re-querying the connector. Use <b>⭳</b>/<b>Import</b> to move runs between machines.</div>
+    </div>
+
     <button class="ghost sm" onclick="exportReport()">⤓ export report (JSON)</button>
   </div>
 
@@ -149,6 +171,7 @@
         <div class="c"><div class="lab">eAON</div><div class="num" id="cEaon" style="color:var(--eaon)">—</div></div>
         <div class="c"><div class="lab">Static AOP (tox.)</div><div class="num" id="cStatic" style="color:var(--static)">—</div></div>
         <div class="c"><div class="lab">TSCE limit</div><div class="num" id="cTsce" style="color:var(--tsce)">—</div></div>
+        <div class="c" style="border-color:var(--eaon)"><div class="lab">eAON &divide; static <i>excess</i></div><div class="num" id="cRatio" style="color:var(--eaon)">—</div></div>
       </div>
       <div class="footwrap" id="cmpNote"></div>
     </div>
@@ -160,9 +183,9 @@
         <div class="legend"><span><i style="background:var(--eaon)"></i>eAON</span><span><i style="background:var(--static)"></i>static</span><span class="note">shaded = exposure window</span></div>
       </div>
       <div class="card">
-        <div class="tag">Cumulative risk vs age</div>
+        <div class="tag">Cumulative risk vs age &middot; promotion premium (right axis)</div>
         <canvas id="riskCanvas" height="220"></canvas>
-        <div class="legend"><span><i style="background:var(--eaon)"></i>eAON</span><span><i style="background:var(--static)"></i>static</span><span><i style="background:var(--tsce)"></i>TSCE</span></div>
+        <div class="legend"><span><i style="background:var(--eaon)"></i>eAON</span><span><i style="background:var(--static)"></i>static</span><span><i style="background:var(--tsce)"></i>TSCE</span><span><i style="background:#e0a800"></i>eAON&divide;static excess (right ×)</span></div>
       </div>
     </div>
 
@@ -177,6 +200,28 @@
         <canvas id="mcCanvas" height="200"></canvas>
         <div class="note" id="mcNote"></div>
       </div>
+    </div>
+
+    <div class="card" id="bodyMapCard">
+      <div class="tag">Target-organ risk map · Absolute (IRIS-anchored)</div>
+      <div id="bodyMap"></div>
+      <div class="note" id="bodyMapNote" style="margin-top:4px">Each stressor is linked to its target organ; the organ fills light-yellow&rarr;dark-red on a fixed log scale of Absolute (IRIS-anchored) excess risk (10⁻⁷&ndash;10⁻¹). Un-targeted organs stay green outlines. Chemical structures load from the connector (EPA CompTox) when a Backend URL / hosted connector is set.</div>
+    </div>
+    <div class="card" id="aonCard">
+      <div class="tag" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Adverse outcome network &middot; combined exposure</span>
+        <span class="aontog"><button id="aonBtnG" class="on" onclick="setAonMode('graph')">Graph</button><button id="aonBtnF" onclick="setAonMode('flow')">Flow</button></span>
+      </div>
+      <div id="aonMap"></div>
+      <div class="note" style="margin-top:4px">Each stressor (left) is wired through the IARC key characteristics it triggers &mdash; its molecular initiating / early key events &mdash; into the two mechanistic arms, <b style="color:#e0563a">initiation</b> (mutation, genotoxic) and <b style="color:#4f93d6">promotion</b> (selection), converging on the adverse outcome in each target organ. <b>Edge colour</b> = mechanism; <b>edge width</b> = each stressor's contribution to the Absolute (IRIS-anchored) excess; <b>highlighted nodes</b> are shared across &ge;2 stressors &mdash; the convergence that makes a mixture more than the sum of its parts. Toggle <b>Graph</b>/<b>Flow</b> for wiring vs. flux views.</div>
+    </div>
+    <div class="card" id="aopCard">
+      <div class="tag" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Molecular AOP cascade &middot; chemical-specific (AOP-Wiki)</span>
+        <span style="display:flex;gap:6px;align-items:center"><button class="sm ghost" onclick="fillAops()" title="auto-pull a cited AOP chain from AOP-Wiki for any stressor without a curated pathway (needs the connector running)">&#9741; Fill from AOP-Wiki</button><span class="aontog"><button id="aopBtnG" class="on" onclick="setAopMode('graph')">Graph</button><button id="aopBtnF" onclick="setAopMode('flow')">Flow</button></span></span>
+      </div>
+      <div id="aopMap"></div>
+      <div class="note" style="margin-top:4px">The detailed, chemical-specific pathway from <b>AOP-Wiki</b>: each stressor's <b>molecular initiating event</b> &rarr; <b>key events</b> &rarr; the shared tissue key event <b>clonal expansion of initiated cells</b> (the q-eAON field &phi;) &rarr; the <b>adverse outcome</b> in its target organ. The cited AOP is shown under each chemical (TCDD AOP 41, benzo[a]pyrene AOP 397, BPA AOP 200, chloroform AOP 220; <b>*</b> = mechanistic proxy AOP 296 for arsenic/benzene, which have no stressor-linked cancer AOP). <b>Colour</b> = genotoxic (red) vs. non-genotoxic / receptor (blue); <b>width</b> = contribution to the Absolute excess; <b>highlighted</b> = key events shared across &ge;2 chemicals &mdash; the mechanistic convergence. Edge <b>opacity</b> reflects evidence confidence; a dashed pink <b>&#8867; modifier</b> edge marks an interaction where one chemical alters another's key-event relationship (e.g. arsenic's DNA-repair inhibition amplifying dioxane-driven oxidative lesions &rarr; co-mutagenesis). Chemicals without a curated AOP fall back to the generic q-eAON cascade, or press <b>&#9741; Fill from AOP-Wiki</b> to auto-pull a cited chain (Tier-0); curated Tier-1 chains take precedence.</div>
     </div>
 
     <div class="card" id="cmpCard" style="display:none">
@@ -238,10 +283,11 @@ function kcChange(i){
 // normalised so the normalised dose x = 1 at the point of departure (POD).
 // Backward compatible: with no dose anchor, x = manual intensity and satG(1)=satP(1)=1.
 const PROM_HILL=2;                                  // >1 => threshold-like promoter
-function satG(x){ return Math.max(0,x); }           // linear, no threshold
+const X50_GENOTOX=30;                               // genotoxic saturation intensity (POD units); satG(1)=1 so tobacco/low-dose calibration is unchanged; per-chemical override via st.x50g
+function satG(x,x50){ x=Math.max(0,x); x50=(x50>0)?x50:X50_GENOTOX; return x*(1+x50)/(x+x50); }  // saturable reactive-metabolite drive (Michaelis-Menten-type): linear at low x, caps at ~1+x50
 function satP(x){ const xh=Math.pow(Math.max(0,x),PROM_HILL); return 2*xh/(1+xh); }
-function xgOf(st){ return (st.dose>0 && st.aed_g>0)? st.dose/st.aed_g : st.intensity; }
-function xpOf(st){ return (st.dose>0 && st.aed_p>0)? st.dose/st.aed_p : st.intensity; }
+function xgOf(st){ return (st.dose!=null && st.aed_g>0)? st.dose/st.aed_g : st.intensity; }
+function xpOf(st){ return (st.dose!=null && st.aed_p>0)? st.dose/st.aed_p : st.intensity; }
 function activeIntensity(st,t){ return (t>=st.start && t<st.stop)? st.intensity : 0; }
 function rates(t,P,stressors,model,suscept){
   let gen=0,prom=0,anyExp=0,everExp=0;
@@ -249,7 +295,7 @@ function rates(t,P,stressors,model,suscept){
     if(t>=st.start)everExp=1;
     if(!(t>=st.start && t<st.stop)) continue;
     anyExp=1;
-    gen += st.g*satG(xgOf(st));
+    gen += st.g*satG(xgOf(st), st.x50g);
     prom += st.p*satP(xpOf(st));
   }
   const m=1+(P.RMU-1)*gen;
@@ -280,13 +326,93 @@ function monteCarlo(stressors,T,suscept,N,cv){
   return {p5:q(0.05),p50:q(0.5),p95:q(0.95),samples:out};
 }
 function factorial(k){let r=1;for(let i=2;i<=k;i++)r*=i;return r;}
-function shapley(stressors,T,suscept){
+function shapley(stressors,T,suscept,P){
+  P=P||PARAMS;
   const n=stressors.length; if(n===0) return [];
   const subs=[]; for(let msk=0;msk<(1<<n);msk++){const s=[];for(let i=0;i<n;i++)if(msk&(1<<i))s.push(i);subs.push(s);}
   const key=s=>s.slice().sort((a,b)=>a-b).join(',');
-  const v={}; subs.forEach(s=>{ v[key(s)]=simulate(PARAMS,stressors.filter((x,i)=>s.includes(i)),'eaon',T,suscept,false).risk; });
+  const v={}; subs.forEach(s=>{ v[key(s)]=simulate(P,stressors.filter((x,i)=>s.includes(i)),'eaon',T,suscept,false).risk; });
   return [...Array(n).keys()].map(i=>{ let val=0; subs.forEach(s=>{ if(!s.includes(i)){ const w=factorial(s.length)*factorial(n-s.length-1)/factorial(n); val+=w*(v[key([...s,i])]-v[key(s)]); } }); return val; });
 }
+
+// ---- Absolute (IRIS-anchored) gain -------------------------------------
+// kappa pins intensity=1 (the chemical's 1e-4 risk-specific dose = its POD)
+// to a 1e-4 lifetime excess, using the field's own nonlinear response so the
+// DOSE-RESPONSE SHAPE is preserved (kappa is a pure vertical rescale).
+// Smoking (intensity anchored epidemiologically) and un-anchored manual
+// stressors keep kappa = 1.
+let RISK_MODE='absolute';
+// ---- Per-tissue calibrated backgrounds (clean-room: blood + liver anchored to their own
+//      somatic-mutation biology + registry incidence; other tissues fall back to lung). ----
+let TISSUE_MODE='pertissue';   // 'pertissue' (each chemical's target organ, default) | 'single' (shared field)
+const TISSUE_PARAMS={
+  lung:            {...DEFAULTS},                                    // Yoshida/Peto (reference)
+  haematopoietic:  {...DEFAULTS, mu0:2.32e-4, S0:0.10,   c:1.99e-4}, // CHIP fitness + SEER AML
+  liver:           {...DEFAULTS, mu0:1e-5,    S0:0.0149, c:0.0605},  // Brunner + SEER/GLOBOCAN HCC (promotion-limited)
+};
+const TISSUE_BY_CAS={ "71-43-2":"haematopoietic","50-00-0":"nasopharynx","50-32-8":"lung","75-01-4":"liver",
+  "106-99-0":"haematopoietic","75-21-8":"haematopoietic","79-01-6":"kidney","1746-01-6":"multi-site",
+  "1162-65-8":"liver","7440-38-2":"lung","7440-43-9":"lung","18540-29-9":"lung","7440-02-0":"lung","57465-28-8":"liver" };
+// Per-chemical genotoxic-saturation intensity x50 (POD units) for satG, from metabolic activation Km / mechanism
+// (see qeaon-recalibration/Km_metabolic_saturation_table.md). Lower x50 = earlier saturation of the reactive-metabolite drive.
+const X50_BY_CAS={
+  "71-43-2":40, "75-01-4":12, "56-23-5":15, "75-09-2":20, "100-42-5":18, "79-01-6":30,
+  "106-99-0":45, "123-91-1":40, "50-32-8":60, "1162-65-8":80,     // metabolically-activated genotoxins (CYP2E1/1A/3A; Km-informed)
+  "1746-01-6":5, "57465-28-8":5, "35065-27-1":5 };                 // AhR/receptor-mediated non-genotoxic promoters -> aggressive cap
+function tissueKey(s){ return (s && s.tissue) ? s.tissue : 'unspecified'; }
+function paramsForTissue(k){ return TISSUE_PARAMS[k] || {...DEFAULTS}; }  // uncalibrated tissue -> lung params, but its OWN field
+// Shapley with each stressor scored inside ITS OWN tissue field: removes cross-organ coupling,
+// preserves genuine same-tissue synergy. Contributions aligned to `stressors`.
+function perTissueShapley(stressors,T,suscept){
+  const groups={}; stressors.forEach((s,i)=>{ const k=tissueKey(s); (groups[k]=groups[k]||[]).push(i); });
+  const out=new Array(stressors.length).fill(0);
+  for(const k in groups){ const idx=groups[k]; const P=paramsForTissue(k);
+    const sh=shapley(idx.map(i=>stressors[i]),T,suscept,P); idx.forEach((i,j)=>out[i]=sh[j]); }
+  return out;
+}
+function _excessI1(g,p,P){
+  P=P||PARAMS;
+  const one=simulate(P,[{name:'_',g:g,p:p,intensity:1,start:0,stop:999}],'eaon',75,1,false).risk;
+  const base=simulate(P,[],'eaon',75,1,false).risk;
+  return one-base;
+}
+function kappaOf(s){
+  if(s._smoking) return 1;
+  const pinnable=(s.dose>0 && ((s.aed_g||0)>0 || (s.aed_p||0)>0));
+  if(!pinnable) return 1;
+  const P=(TISSUE_MODE==='pertissue')? paramsForTissue(tissueKey(s)) : PARAMS;
+  const e=_excessI1(s.g,s.p,P);
+  return e>0 ? 1e-4/e : 1;
+}
+
+// ---- INTEGRA dietary: 41 food groups. `k` = INTEGRA field token; `a` = adult daily
+//      consumption default (g/day, editable). The chemical's concentration is set PER
+//      food (default 0) so it is no longer assumed present in every food at one value. ----
+const DIET_FOODS=[
+ {k:"BREAD",l:"Bread",a:120},{k:"CEREALS",l:"Cereals",a:30},{k:"BREAKFAST_CEREALS",l:"Breakfast cereals",a:20},
+ {k:"PASTA_RICE",l:"Pasta / rice",a:80},{k:"BISCUITS_CRISPY_BREAD",l:"Biscuits / crispbread",a:20},
+ {k:"BAKERIES_SNACKS",l:"Bakery / snacks",a:30},{k:"CAKES_BUNS_PUDDINGS",l:"Cakes / buns / puddings",a:30},
+ {k:"POTATOES",l:"Potatoes",a:100},{k:"VEGETABLES",l:"Vegetables",a:200},{k:"FRUITS",l:"Fruits",a:150},
+ {k:"NUTS",l:"Nuts",a:10},{k:"MEAT",l:"Meat",a:60},{k:"POULTRY",l:"Poultry",a:30},{k:"SAUCAGE",l:"Sausage",a:25},
+ {k:"FISH",l:"Fish",a:30},{k:"EGGS",l:"Eggs",a:25},{k:"MILK",l:"Milk",a:150},{k:"YOGURT",l:"Yogurt",a:60},
+ {k:"CHEESE",l:"Cheese",a:30},{k:"CREAM",l:"Cream",a:10},{k:"ICE_CREAM",l:"Ice cream",a:15},
+ {k:"ANIMAL_FATS",l:"Animal fats",a:10},{k:"VEG_OILS",l:"Vegetable oils",a:20},{k:"SPREADS",l:"Spreads",a:10},
+ {k:"SUGAR",l:"Preserves / sugar",a:15,alt:"PRESERVES_SUGAR"},{k:"CONFECTIONERY",l:"Confectionery",a:15},
+ {k:"SPICES",l:"Spices",a:3},{k:"SOUPS_SAUCES",l:"Soups / sauces",a:50},{k:"OTHER",l:"Other",a:20},
+ {k:"TAP_WATER",l:"Tap water",a:1000},{k:"BOTTLED_WATER",l:"Bottled water",a:300},{k:"JUICE",l:"Juice",a:100},
+ {k:"SOFT_DRINKS",l:"Soft drinks",a:200},{k:"COFFEE",l:"Coffee",a:400},{k:"TEA",l:"Tea",a:300},
+ {k:"BEER",l:"Beer",a:250},{k:"WINE",l:"Wine",a:100},{k:"SPIRITS",l:"Spirits",a:20},
+ {k:"BREAST_MILK",l:"Breast milk",a:0},{k:"INFANT_FORMULAS",l:"Infant formula",a:0},{k:"COMMERCIAL_INFANT_FOOD",l:"Infant food",a:0},
+];
+// fix the one token whose INTEGRA field name differs from the label key
+DIET_FOODS.forEach(f=>{ if(f.alt) f.k=f.alt; });
+function dietSet(i,which,food,val){
+  const s=STRESSORS[i]; s.dietConc=s.dietConc||{}; s.dietAmt=s.dietAmt||{};
+  const v = (val===''||val==null)? null : +val;
+  if(which==='conc') s.dietConc[food]=v; else s.dietAmt[food]=v;
+}
+function dietOverride(i,val){ STRESSORS[i].dietOverride = (val===''||val==null)? null : +val; }
+function dietAmt(s,f){ return (s.dietAmt && s.dietAmt[f.k]!=null) ? s.dietAmt[f.k] : f.a; }
 
 // ============================ UI ============================
 function integraPanel(s,i){
@@ -295,9 +421,17 @@ function integraPanel(s,i){
       <details class="kcpanel"${s._exopen?' open':''} ontoggle="STRESSORS[${i}]._exopen=this.open"><summary>Exposure scenario (INTEGRA)</summary>
         <div class="kcnote">Mechanistic aggregate exposure &rarr; mean daily dose via INTEGRA (AUTH). Enter any concentrations; the connector (with an INTEGRA key) computes the dose and fills it above.</div>
         <div class="mini">
-          <div><label>body weight (kg)</label><input type="number" step="any" value="${s.ibw!=null?s.ibw:70}" onchange="STRESSORS[${i}].ibw=+this.value"></div>
-          <div><label>diet conc (&micro;g/g)</label><input type="number" step="any" value="${s.ifc!=null?s.ifc:''}" placeholder="optional" onchange="STRESSORS[${i}].ifc=this.value===''?null:+this.value"></div>
+          <div style="grid-column:1 / span 2"><label>body weight (kg)</label><input type="number" step="any" value="${s.ibw!=null?s.ibw:70}" onchange="STRESSORS[${i}].ibw=+this.value"></div>
         </div>
+        <details class="kcpanel"${s._dietopen?' open':''} ontoggle="STRESSORS[${i}]._dietopen=this.open" style="margin-top:6px"><summary>Dietary intake — per food group</summary>
+          <div class="kcnote">Set the chemical's concentration in each food group (default 0 = not present); consumption is the adult daily default (editable). Daily intake = &Sigma;(consumption &times; concentration) across the 41 groups, computed by INTEGRA.</div>
+          <div class="mini"><div style="grid-column:1 / span 2"><label>override: total daily intake (&micro;g/day)</label><input type="number" step="any" placeholder="optional — bypasses the table" value="${s.dietOverride!=null?s.dietOverride:''}" onchange="dietOverride(${i},this.value)"></div></div>
+          <div style="max-height:210px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:6px">
+            <table style="font-size:11px"><tr><th style="text-align:left">food group</th><th>g/day</th><th>&micro;g/g</th></tr>
+              ${DIET_FOODS.map(f=>`<tr><td style="text-align:left">${f.l}</td><td><input type="number" step="any" style="width:56px" value="${dietAmt(s,f)}" onchange="dietSet(${i},'amt','${f.k}',this.value)"></td><td><input type="number" step="any" style="width:56px" placeholder="0" value="${(s.dietConc&&s.dietConc[f.k]!=null)?s.dietConc[f.k]:''}" onchange="dietSet(${i},'conc','${f.k}',this.value)"></td></tr>`).join('')}
+            </table>
+          </div>
+        </details>
         <div class="mini" style="margin-top:6px">
           <div><label>air conc (&micro;g/m&sup3;)</label><input type="number" step="any" value="${s.iac!=null?s.iac:''}" placeholder="optional" onchange="STRESSORS[${i}].iac=this.value===''?null:+this.value"></div>
           <div><label>soil/dust (&micro;g/g)</label><input type="number" step="any" value="${s.isc!=null?s.isc:''}" placeholder="optional" onchange="STRESSORS[${i}].isc=this.value===''?null:+this.value"></div>
@@ -312,6 +446,11 @@ function renderStressors(){
     const d=document.createElement('div'); d.className='stressor';
     d.innerHTML=`<span class="x" onclick="rmStressor(${i})">✕</span>
       <div class="row"><label>Name</label><input type="text" value="${s.name}" onchange="upd(${i},'name',this.value)"></div>
+      <div class="row"><label>Target tissue</label>
+        <select onchange="upd(${i},'tissue',this.value); run();">
+          ${['unspecified','lung','haematopoietic','liver','kidney','nasopharynx','skin','brain','bladder','stomach','reproductive','thyroid','bone','multi-site'].map(t=>`<option value="${t}"${tissueKey(s)===t?' selected':''}>${t}${(t==='haematopoietic'||t==='liver')?' (calibrated)':''}</option>`).join('')}
+        </select>
+      </div>
       <div class="mini">
         <div><label>start age</label><input type="number" value="${s.start}" onchange="upd(${i},'start',+this.value)"></div>
         <div><label>stop age</label><input type="number" value="${s.stop>=900?'':s.stop}" placeholder="never" onchange="upd(${i},'stop',this.value===''?999:+this.value)"></div>
@@ -329,6 +468,11 @@ function renderStressors(){
         <div class="kcnote">Tick the carcinogen key characteristics with mechanistic evidence; g and p are computed automatically. <b>var</b> = generates heritable variation → g; <b>sel</b> = alters selective value → p; <b>both</b> = contributes to each.</div>
         ${KCS.map((k,j)=>`<label class="kcrow"><input type="checkbox" ${(s.kc||[]).includes(j)?'checked':''} id="kc_${i}_${j}" onchange="kcChange(${i})"><span>${k.n}</span><em class="${k.g&&k.p?'both':''}">${k.g&&k.p?'both':(k.g?'var':'sel')}</em></label>`).join('')}
       </details>
+      <details class="kcpanel"${s._hzopen?' open':''} ontoggle="STRESSORS[${i}]._hzopen=this.open"><summary>Auto-fill g&middot;p from ToxCast / IARC</summary>
+        <div class="kcnote">Fills g (genotoxicity — EPA GeneTox/IARC), p (ToxCast/Tox21 promotion), the target tissue and the dose anchor from the hazard databases, using the <b>Name</b> above (a chemical name, CAS, or DTXSID). Needs the connector running.</div>
+        <button class="sm" style="margin-top:6px" onclick="loadGpInto(${i})">Load g/p from ToxCast &#9656;</button>
+        <div class="note" id="hz_${i}" style="margin-top:6px">${s._hzmsg||''}</div>
+      </details>
       ${integraPanel(s,i)}
 `;
     el.appendChild(d);
@@ -339,9 +483,9 @@ function fmtd(x){ return (x==null)?'?':(x>=100?(+x).toFixed(0):x>=1?(+x).toFixed
 function doseNote(s){
   if(s.aed_g>0 || s.aed_p>0){
     let t='intensity 1 = POD. AED: g '+fmtd(s.aed_g)+', p '+fmtd(s.aed_p)+' mg/kg·d';
-    if(s.dose>0){ const xg=s.aed_g? fmtd(s.dose/s.aed_g):'n/a', xp=s.aed_p? fmtd(s.dose/s.aed_p):'n/a';
+    if(s.dose!=null){ const xg=s.aed_g? fmtd(s.dose/s.aed_g):'n/a', xp=s.aed_p? fmtd(s.dose/s.aed_p):'n/a';
       t+=' → x_g='+xg+', x_p='+xp+' <b>(dose drives intensity)</b>'; }
-    else t+=' — enter a dose above to drive intensity';
+    else t+=' — enter a dose above (or build an INTEGRA scenario) to drive intensity';
     if(s.exp>0){ t+='<br>SEEM population exposure ≈ '+fmtd(s.exp)+' mg/kg·d'+(s.ber?(' · BER ≈ '+fmtd(s.ber)+' (higher = ample margin)'):''); }
     return t;
   }
@@ -349,13 +493,20 @@ function doseNote(s){
     return 'POD (internal): g '+fmtd(s.pod_g_uM)+', p '+fmtd(s.pod_p_uM)+' µM. No httk C<sub>ss</sub> → external-dose anchor unavailable; using manual intensity.';
   return 'No dose anchor — using manual intensity (x = dose/POD). Load a chemical from the hazard DB to attach a POD.';
 }
-function addStressor(){ STRESSORS.push({name:'stressor '+(STRESSORS.length+1),start:0,stop:999,intensity:1,g:0.5,p:0.5}); renderStressors(); }
+function addStressor(){ STRESSORS.push({name:'stressor '+(STRESSORS.length+1),start:0,stop:999,intensity:0,g:0.5,p:0.5}); renderStressors(); }
 function rmStressor(i){ STRESSORS.splice(i,1); renderStressors(); }
 function preset(k){
-  if(k==='never') STRESSORS=[];
-  if(k==='cont') STRESSORS=[{name:'tobacco smoke',start:20,stop:999,intensity:1,g:1,p:1,_smoking:true}];
-  if(k==='quit') STRESSORS=[{name:'tobacco smoke',start:20,stop:50,intensity:1,g:1,p:1,_smoking:true}];
-  if(k==='mix') STRESSORS=[{name:'genotoxic initiator',start:0,stop:50,intensity:1,g:1,p:0},{name:'non-genotoxic promoter',start:0,stop:50,intensity:1,g:0,p:1}];
+  // Smoking presets only manage the tobacco stressor; user-added stressors are preserved.
+  if(k==='never' || k==='cont' || k==='quit'){
+    const rest = STRESSORS.filter(s=>!s._smoking);
+    let smk=[];
+    if(k==='cont') smk=[{name:'tobacco smoke',start:20,stop:999,intensity:1,g:1,p:1,_smoking:true}];
+    if(k==='quit') smk=[{name:'tobacco smoke',start:20,stop:50,intensity:1,g:1,p:1,_smoking:true}];
+    STRESSORS = smk.concat(rest);
+  } else if(k==='mix'){
+    const rest = STRESSORS.filter(s=>!s._demo);
+    STRESSORS = rest.concat([{name:'genotoxic initiator',start:0,stop:50,intensity:1,g:1,p:0,_demo:true},{name:'non-genotoxic promoter',start:0,stop:50,intensity:1,g:0,p:1,_demo:true}]);
+  }
   renderStressors(); run();
 }
 function renderParams(){
@@ -382,25 +533,41 @@ function run(){
   const stat=simulate(PARAMS,STRESSORS,'static',T,suscept,true);
   const tsce=simulate(PARAMS,STRESSORS,'tsce',T,suscept,true);
   const mc=monteCarlo(STRESSORS,T,suscept,N,cv);
-  const sh=shapley(STRESSORS,T,suscept);
-  const bg=simulate(PARAMS,[],'eaon',T,suscept,false).risk;
-  LAST={T,suscept,eaon,stat,tsce,mc,sh,bg,stressors:JSON.parse(JSON.stringify(STRESSORS)),params:{...PARAMS}};
+  // Per-tissue mode scores each stressor inside its own calibrated tissue field (removes
+  // cross-organ fake synergy); single mode = one shared lung field (current behaviour).
+  const sh=(TISSUE_MODE==='pertissue')? perTissueShapley(STRESSORS,T,suscept) : shapley(STRESSORS,T,suscept);
+  const bgt=simulate(PARAMS,[],'eaon',T,suscept,true), bg=bgt.risk;
+  // Display transform: kappa (absolute mode) x per-stressor Shapley, summed onto the
+  // reference background. S scales the shared-field curve/cards to the displayed total.
+  const kap=STRESSORS.map(kappaOf);
+  const absExcess=STRESSORS.reduce((a,s,i)=>a+kap[i]*sh[i],0);
+  const denom=eaon.risk-bg;
+  const S=((RISK_MODE==='absolute'||TISSUE_MODE==='pertissue') && denom>1e-12)? absExcess/denom : 1;
+  const tr=r=>bg+S*(r-bg);
+  LAST={T,suscept,eaon,stat,tsce,mc,sh,bg,kap,S,tr,stressors:JSON.parse(JSON.stringify(STRESSORS)),params:{...PARAMS}};
 
-  document.getElementById('riskMain').textContent=fmtPct(eaon.risk);
-  document.getElementById('riskCI').textContent=mc?`90% CI ${fmtPct(mc.p5)} – ${fmtPct(mc.p95)}`:'';
-  const ratio=stat.risk>0?(eaon.risk/stat.risk):0;
-  document.getElementById('riskSub').innerHTML=`Background (no exposure): <b>${fmtPct(bg)}</b>. The eAON estimate is <b>${ratio.toFixed(1)}×</b> the static toxicological reading.`;
-  document.getElementById('cEaon').textContent=fmtPct(eaon.risk);
-  document.getElementById('cStatic').textContent=fmtPct(stat.risk);
-  document.getElementById('cTsce').textContent=fmtPct(tsce.risk);
+  document.getElementById('riskMain').textContent=fmtPct(tr(eaon.risk));
+  document.getElementById('riskCI').textContent=mc?`90% CI ${fmtPct(tr(mc.p5))} – ${fmtPct(tr(mc.p95))}`:'';
+  const _exE=tr(eaon.risk)-bg, _exS=tr(stat.risk)-bg; const ratio=_exS>1e-9?_exE/_exS:(eaon.risk>stat.risk*1.01?99:1);  // excess ratio = transform-invariant, matches the displayed cards
+  const tissueNote = (TISSUE_MODE==='pertissue') ? ` <b>Per-tissue fields:</b> each stressor acts in its own calibrated organ field (blood &amp; liver calibrated; other tissues use lung); different organs combine independently.` : '';
+  document.getElementById('riskSub').innerHTML = (RISK_MODE==='absolute'
+    ? `<b>Absolute (IRIS-anchored):</b> each anchored chemical's gain κ pins intensity = 1 (its 10⁻⁴ risk-specific dose) to 10⁻⁴; smoking / un-anchored stressors keep κ = 1. Background: <b>${fmtPct(bg)}</b>. eAON excess is <b>${ratio.toFixed(1)}×</b> the static excess (promotion / selection; dose-response shape unchanged).`
+    : `Background (no exposure): <b>${fmtPct(bg)}</b>. The eAON's excess is <b>${ratio.toFixed(1)}×</b> the static toxicological excess.`) + tissueNote;
+  document.getElementById('cEaon').textContent=fmtPct(tr(eaon.risk));
+  document.getElementById('cStatic').textContent=fmtPct(tr(stat.risk));
+  document.getElementById('cTsce').textContent=fmtPct(tr(tsce.risk));
+  document.getElementById('cRatio').textContent=(ratio>=99?'≥99':ratio.toFixed(1))+'×';
   document.getElementById('cmpNote').innerHTML = eaon.risk>stat.risk*1.2
     ? 'The static (genotoxic-MIE) reading <b>under-estimates</b> risk because it cannot represent promotion / selection. The eAON captures it; the TSCE column shows the constant-rate two-stage value the eAON reduces to.'
     : 'For a purely genotoxic exposure the three estimates converge — selection adds little, and the eAON reduces to two-stage theory.';
 
   drawPhi(eaon,stat);
-  drawRisk(eaon,stat,tsce);
-  drawShapley(sh,bg);
-  drawMC(mc,eaon.risk);
+  drawRisk(eaon,stat,tsce,S,bg,bgt);
+  drawShapley(sh,bg,kap);
+  drawMC(mc,eaon.risk,S,bg);
+  drawBodyMap(sh,kap,bg);
+  drawAON(sh,kap);
+  drawAOP(sh,kap);
   renderSaved();
 }
 
@@ -424,14 +591,29 @@ function drawPhi(eaon,stat){
   const line=(tr,col)=>{ x.strokeStyle=col;x.lineWidth=2;x.beginPath();tr.forEach((p,i)=>{const X=A.px(p.t),Y=A.py(p.phi);i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke(); };
   line(stat.traj,'#5b9bd5'); line(eaon.traj,'#d7263d');
 }
-function drawRisk(eaon,stat,tsce){
-  const {x,w,h}=setup('riskCanvas'); const ymax=Math.max(0.01,eaon.risk,stat.risk,tsce.risk)*1.2;
+function drawRisk(eaon,stat,tsce,S,bg,bgt){
+  const g=(S==null?1:S), b=(bg==null?0:bg); const trf=r=>b+g*(r-b);
+  const {x,w,h}=setup('riskCanvas'); const ymax=Math.max(0.01,trf(eaon.risk),trf(stat.risk),trf(tsce.risk))*1.2;
   const T=LAST.T; const A=axes(x,w,h,T,ymax,'age (years)','risk',true);
-  const line=(tr,col)=>{ x.strokeStyle=col;x.lineWidth=2;x.beginPath();tr.forEach((p,i)=>{const X=A.px(p.t),Y=A.py(p.r);i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke(); };
+  const line=(series,col)=>{ x.strokeStyle=col;x.lineWidth=2;x.beginPath();series.forEach((p,i)=>{const X=A.px(p.t),Y=A.py(trf(p.r));i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke(); };
   line(tsce.riskByAge,'#7f8c8d'); line(stat.riskByAge,'#5b9bd5'); line(eaon.riskByAge,'#d7263d');
+  // RIGHT AXIS (amber, dashed): promotion premium = eAON excess / static excess, vs age
+  if(bgt && bgt.riskByAge){
+    const n=Math.min(eaon.riskByAge.length,stat.riskByAge.length,bgt.riskByAge.length);
+    const pts=[]; let rmax=2;
+    for(let i=0;i<n;i++){ const exE=eaon.riskByAge[i].r-bgt.riskByAge[i].r, exS=stat.riskByAge[i].r-bgt.riskByAge[i].r;
+      const rr=(exS>1e-8)?Math.max(0,exE/exS):null; pts.push({t:eaon.riskByAge[i].t,r:rr}); if(rr!=null&&rr>rmax)rmax=rr; }
+    rmax=Math.min(rmax*1.15,50);
+    const ry=v=>A.Tp+(h-A.B-A.Tp)*(1-Math.min(v,rmax)/rmax);
+    x.font='10px sans-serif'; x.textAlign='right'; x.fillStyle='#e0a800';
+    for(let i=0;i<=4;i++){ const val=rmax*(1-i/4), yy=A.Tp+(h-A.B-A.Tp)*i/4; x.fillText(val.toFixed(val<10?1:0)+'×',w-2,yy+3); }
+    x.textAlign='left';
+    x.strokeStyle='#e0a800'; x.lineWidth=1.8; x.setLineDash([6,3]); x.beginPath(); let st=false;
+    pts.forEach(p=>{ if(p.r==null)return; const X=A.px(p.t),Y=ry(p.r); if(!st){x.moveTo(X,Y);st=true;}else x.lineTo(X,Y); }); x.stroke(); x.setLineDash([]);
+  }
 }
-function drawShapley(sh,bg){
-  const items=[{n:'background',v:bg,c:'#3a4a5c'},...LAST.stressors.map((s,i)=>({n:s.name,v:sh[i],c:i%2?'#d7263d':'#e0793f'}))];
+function drawShapley(sh,bg,kap){
+  const items=[{n:'background',v:bg,c:'#3a4a5c'},...LAST.stressors.map((s,i)=>({n:s.name,v:(kap?kap[i]:1)*sh[i],c:i%2?'#d7263d':'#e0793f'}))];
   const Tp=10,bh=28,gap=6,pad=12;
   // grow the canvas so every stressor fits (no clipping beyond 5-6 bars)
   const cv=document.getElementById('shapCanvas');
@@ -442,24 +624,240 @@ function drawShapley(sh,bg){
   x.font='11px sans-serif';
   items.forEach((it,i)=>{ const y=Tp+i*(bh+6); const bw=(w-110)*Math.max(0,it.v)/tot; x.fillStyle=it.c;x.fillRect(110,y,Math.max(1,bw),bh); x.fillStyle='#e7eef6';x.textAlign='right';x.fillText(it.n,104,y+bh/2+4); x.textAlign='left';x.fillStyle='#9fb3c8';x.fillText(fmtPct(it.v),112+bw,y+bh/2+4); });
   x.textAlign='left';
-  document.getElementById('shapNote').innerHTML = LAST.stressors.length? `Shapley values are order-independent and additive: background + contributions = total risk (${fmtPct(LAST.eaon.risk)}).` : 'Add stressors to apportion mixture risk.';
+  document.getElementById('shapNote').innerHTML = LAST.stressors.length? `Shapley values are order-independent and additive: background + contributions = total risk (${fmtPct(LAST.tr?LAST.tr(LAST.eaon.risk):LAST.eaon.risk)}).` : 'Add stressors to apportion mixture risk.';
 }
-function drawMC(mc,point){
+function drawMC(mc,point,S,bg){
   const {x,w,h}=setup('mcCanvas');
   if(!mc){ x.fillStyle='#9fb3c8';x.font='12px sans-serif';x.fillText('Monte-Carlo disabled (set MC samples > 0).',12,h/2); document.getElementById('mcNote').textContent=''; return; }
-  const s=mc.samples; const xmax=Math.max(...s)*1.05; const bins=24; const hist=new Array(bins).fill(0);
-  s.forEach(v=>{ const b=Math.min(bins-1,Math.floor(v/xmax*bins)); hist[b]++; });
+  const g=(S==null?1:S), b=(bg==null?0:bg); const trf=r=>b+g*(r-b);
+  const s=mc.samples.map(trf); const xmax=Math.max(...s)*1.05; const bins=24; const hist=new Array(bins).fill(0);
+  s.forEach(v=>{ const bb=Math.min(bins-1,Math.floor(v/xmax*bins)); hist[bb]++; });
   const ymax=Math.max(...hist); const L=42,B=24,Tp=8,R=8;
   x.fillStyle='#9fb3c8';x.font='10px sans-serif';
   for(let i=0;i<=4;i++){ const xx=L+(w-R-L)*i/4; x.fillText((xmax*i/4*100).toFixed(1)+'%',xx-10,h-B+13); }
   hist.forEach((c,i)=>{ const X=L+(w-R-L)*i/bins, bw=(w-R-L)/bins-1, Y=Tp+(h-B-Tp)*(1-c/ymax); x.fillStyle='#34557a';x.fillRect(X,Y,bw,h-B-Y); });
   const px=v=>L+(w-R-L)*v/xmax;
-  [['#2e9e5b',mc.p5],['#e7eef6',mc.p50],['#e0a800',mc.p95]].forEach(([col,v])=>{ x.strokeStyle=col;x.lineWidth=1.5;x.beginPath();x.moveTo(px(v),Tp);x.lineTo(px(v),h-B);x.stroke(); });
-  document.getElementById('mcNote').innerHTML=`median <b>${fmtPct(mc.p50)}</b>, 90% CI ${fmtPct(mc.p5)}–${fmtPct(mc.p95)} (n=${s.length}).`;
+  [['#2e9e5b',trf(mc.p5)],['#e7eef6',trf(mc.p50)],['#e0a800',trf(mc.p95)]].forEach(([col,v])=>{ x.strokeStyle=col;x.lineWidth=1.5;x.beginPath();x.moveTo(px(v),Tp);x.lineTo(px(v),h-B);x.stroke(); });
+  document.getElementById('mcNote').innerHTML=`median <b>${fmtPct(trf(mc.p50))}</b>, 90% CI ${fmtPct(trf(mc.p5))}–${fmtPct(trf(mc.p95))} (n=${s.length}).`;
+}
+
+// ============================ TARGET-ORGAN BODY MAP ============================
+const ORGAN_OF={lung:'lung',haematopoietic:'marrow',bone:'marrow',liver:'liver',kidney:'kidney',
+  nasopharynx:'naso',skin:'skin',brain:'brain',bladder:'bladder',reproductive:'repro',prostate:'repro',
+  breast:'repro',ovary:'repro',stomach:'gi',gi:'gi',colon:'gi',pancreas:'gi',thyroid:'thyroid'};
+const ORG={brain:[147,55,26,20],naso:[146,108,11,13],thyroid:[146,124,15,8],lung:[146,190,42,32],liver:[122,260,30,24],gi:[146,332,40,32],kidney:[146,302,44,16],bladder:[146,375,16,13],repro:[146,392,18,13],marrow:[103,455,13,42]};
+const FRAME_ORGANS={skin:1,systemic:1};
+const BODY_IMG='body_atlas.png';
+const ORGAN_LABEL={brain:'brain',naso:'nasopharynx',thyroid:'thyroid',lung:'lung',liver:'liver',
+  kidney:'kidney',gi:'GI tract',bladder:'bladder',repro:'reproductive',marrow:'bone marrow',skin:'skin',systemic:'systemic'};
+const YLORRD=['#ffffcc','#ffeda0','#fed976','#feb24c','#fd8d3c','#fc4e2a','#bd0026','#7a0177','#3f007d'];
+function _lerp(a,b,t){return Math.round(a+(b-a)*t);}
+function _hx(c){return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];}
+function ramp(t){ t=Math.max(0,Math.min(1,t)); const x=t*(YLORRD.length-1); const i=Math.floor(x);
+  if(i>=YLORRD.length-1) return YLORRD[YLORRD.length-1]; const a=_hx(YLORRD[i]),b=_hx(YLORRD[i+1]),f=x-i;
+  return `rgb(${_lerp(a[0],b[0],f)},${_lerp(a[1],b[1],f)},${_lerp(a[2],b[2],f)})`; }
+function heatColor(v){ if(!(v>0)) return null; const t=(Math.log10(v)+7)/6; return ramp(t); }
+function organOf(s){ const t=tissueKey(s); if(!t||t==='multi-site'||t==='unspecified') return 'systemic'; return ORGAN_OF[t]||'systemic'; }
+function fmtRiskV(v){ if(!(v>0)) return '0'; return v.toExponential(1); }
+function drawBodyMap(sh,kap,bg){
+  const host=document.getElementById('bodyMap'); if(!host) return;
+  const bx=312,by=20,CEN=146,BW=297,BH=600;
+  const orisk={};
+  STRESSORS.forEach((s,i)=>{ const o=organOf(s); orisk[o]=(orisk[o]||0)+Math.max(0,(kap[i]||1)*(sh[i]||0)); });
+  const rOf=id=>orisk[id]||0;
+  let defs='<filter id="redify" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.843  0 0 0 0 0.149  0 0 0 0 0.239  -0.333 -0.333 -0.333 0 1" result="r"/><feComponentTransfer in="r" result="r2"><feFuncA type="table" tableValues="0 0 0 0.55 1 1"/></feComponentTransfer><feComposite in="r2" in2="SourceGraphic" operator="in"/></filter>',glows='';
+  Object.keys(ORG).forEach(id=>{ const v=rOf(id); if(v>0){ const c=heatColor(v),a=ORG[id];
+    defs+=`<radialGradient id="gg_${id}"><stop offset="0%" stop-color="${c}" stop-opacity="0.9"/><stop offset="55%" stop-color="${c}" stop-opacity="0.55"/><stop offset="100%" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
+    glows+=`<ellipse cx="${bx+a[0]}" cy="${by+a[1]}" rx="${a[2]}" ry="${a[3]}" fill="url(#gg_${id})"/>`; } });
+  const skinV=(orisk['skin']||0)+(orisk['systemic']||0);
+  let frame=''; if(skinV>0){ const c=heatColor(skinV); frame=`<rect x="${bx-6}" y="${by-6}" width="${BW+12}" height="${BH+12}" rx="20" fill="none" stroke="${c}" stroke-width="8" stroke-opacity="0.45"/>`; }
+  const base=(document.getElementById('tcUrl')?document.getElementById('tcUrl').value:'').replace(/\/$/,'');
+  const items=STRESSORS.map((s,i)=>{ const o=organOf(s); const g=ORG[o]||[CEN,250]; return {s,i,ox:g[0],oy:g[1],o,fr:!!FRAME_ORGANS[o]}; });
+  const Ld=[],Rd=[],C=[];
+  items.forEach(it=>{ if(it.fr)C.push(it); else if(it.ox<CEN-6)Ld.push(it); else if(it.ox>CEN+6)Rd.push(it); else C.push(it); });
+  C.sort((a,b)=>a.oy-b.oy);
+  C.forEach(it=>{ (Ld.length<=Rd.length?Ld:Rd).push(it); });
+  Ld.sort((a,b)=>a.oy-b.oy); Rd.sort((a,b)=>a.oy-b.oy);
+  function node(o,x,y){ const s=o.s,i=o.i; const side=x<460?'L':'R'; let ax,ay;
+    if(o.fr){ ax=side==='L'?bx-6:bx+BW+6; ay=y; } else { ax=bx+o.ox; ay=by+o.oy; }
+    const wide=({"1746-01-6":1,"57465-28-8":1,"35065-27-1":1,"50-32-8":1,"1162-65-8":1}[s.casrn])||/dioxin|dibenzo|furan|\bpcb\b|benzo|pyrene|aflatoxin|biphenyl/i.test(s.name||'');
+    const IW=wide?98:66, IH=wide?74:50, hw=IW/2, hh=IH/2, lyN=y+hh+13, lyS=y+hh+25;
+    const ex=side==='L'?x+hw+2:x-hw-2; const risk=Math.max(0,(kap[i]||1)*(sh[i]||0)); const c=heatColor(risk)||'#7f8c8d';
+    const conn=`<path d="M${ex},${y} C${(ex+ax)/2},${y} ${(ex+ax)/2},${ay} ${ax},${ay}" fill="none" stroke="#d7263d" stroke-width="1.4" stroke-dasharray="4 3"/><circle cx="${ax}" cy="${ay}" r="3.2" fill="${c}" stroke="#e7eef6" stroke-width="0.8"/>`;
+    const img=s.dtxsid?`<image href="${base}/structure/${s.dtxsid}" x="${x-hw}" y="${y-hh}" width="${IW}" height="${IH}" preserveAspectRatio="xMidYMid meet" filter="url(#redify)"/>`:`<rect x="${x-33}" y="${y-25}" width="66" height="50" rx="6" fill="#0e1722" stroke="#28384a"/><text x="${x}" y="${y+2}" text-anchor="middle" font-size="8" fill="#6b7f95">no structure</text>`;
+    const nm=(s.name||('stressor '+(i+1))).slice(0,20);
+    return conn+`<g>${img}<text x="${x}" y="${lyN}" text-anchor="middle" font-size="11" fill="var(--ink)" font-weight="600">${nm}</text><text x="${x}" y="${lyS}" text-anchor="middle" font-size="9" fill="var(--muted)">${ORGAN_LABEL[o.o]} · ${fmtRiskV(risk)}</text></g>`; }
+  function placeCol(list,x){ const n=list.length; return list.map((o,k)=>node(o,x,95+(k+0.5)*(420/Math.max(1,n)))).join(''); }
+  const nodes=placeCol(Ld,120)+placeCol(Rd,800);
+  let bar=''; for(let k=0;k<=50;k++) bar+=`<rect x="${330+k*5}" y="628" width="5" height="12" fill="${ramp(k/50)}"/>`;
+  const legend=bar+`<text x="330" y="652" font-size="9" fill="var(--muted)">10⁻⁷</text><text x="455" y="652" font-size="9" fill="var(--muted)" text-anchor="middle">10⁻⁴</text><text x="580" y="652" text-anchor="end" font-size="9" fill="var(--muted)">10⁻¹ excess risk</text>`;
+  host.innerHTML=`<svg viewBox="0 0 920 668" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs><image href="${BODY_IMG}" x="${bx}" y="${by}" width="${BW}" height="${BH}"/>${frame}${glows}${nodes}${legend}</svg>`;
+}
+
+// ============================ ADVERSE OUTCOME NETWORK ============================
+let AON_MODE='graph', AON_LAST=null;
+function setAonMode(m){ AON_MODE=m; const g=document.getElementById('aonBtnG'),f=document.getElementById('aonBtnF');
+  if(g&&f){ g.classList.toggle('on',m==='graph'); f.classList.toggle('on',m==='flow'); }
+  if(AON_LAST) drawAON(AON_LAST.sh,AON_LAST.kap); }
+function _aonEdge(x1,y1,x2,y2){ const mx=(x1+x2)/2; return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
+function _aonBand(x1,y1,x2,y2,w){ const mx=(x1+x2)/2,h=w/2;
+  return `M${x1},${y1-h} C${mx},${y1-h} ${mx},${y2-h} ${x2},${y2-h} L${x2},${y2+h} C${mx},${y2+h} ${mx},${y1+h} ${x1},${y1+h} Z`; }
+function _txtOn(rgb){ const m=/rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(rgb||''); if(!m) return '#e7eef6'; const L=0.299*+m[1]+0.587*+m[2]+0.114*+m[3]; return L>150?'#0b1420':'#ffffff'; }
+function drawAON(sh,kap){
+  const host=document.getElementById('aonMap'); if(!host) return;
+  AON_LAST={sh,kap};
+  const S=STRESSORS.map((s,i)=>({s,i,risk:Math.max(0,(kap[i]||1)*(sh[i]||0)),organ:organOf(s),kc:(s.kc||[]).slice()})).filter(a=>a.kc.length||a.risk>0);
+  if(!S.length){ host.innerHTML='<div class="note" style="padding:14px">Add a stressor and score its key characteristics (or auto-fill from ToxCast) to see the adverse-outcome network.</div>'; return; }
+  const armOf=j=>{ const k=KCS[j]||{}; return (k.g>0&&k.p>0)?'both':(k.g>0?'gen':'prom'); };
+  const ARM={gen:'#e0563a',prom:'#4f93d6',both:'#b07acc'}, HUB={init:'#e0563a',prom:'#4f93d6'};
+  const kcSet=[...new Set([].concat(...S.map(a=>a.kc)))].sort((a,b)=>a-b);
+  const orgRisk={}; S.forEach(a=>{ orgRisk[a.organ]=(orgRisk[a.organ]||0)+a.risk; });
+  const organs=Object.keys(orgRisk);
+  const kcN={}; kcSet.forEach(j=>kcN[j]=S.filter(a=>a.kc.includes(j)).length);
+  const orgN={}; organs.forEach(o=>orgN[o]=S.filter(a=>a.organ===o).length);
+  const orgArm={}; organs.forEach(o=>{ const cs=S.filter(a=>a.organ===o);
+    orgArm[o]={init:cs.some(a=>a.kc.some(j=>armOf(j)!=='prom')), prom:cs.some(a=>a.kc.some(j=>armOf(j)!=='gen'))}; });
+  const hubHasInit=kcSet.some(j=>armOf(j)!=='prom'), hubHasProm=kcSet.some(j=>armOf(j)!=='gen');
+  const hubs=[]; if(hubHasInit)hubs.push('init'); if(hubHasProm)hubs.push('prom');
+  const maxRisk=Math.max(1e-30,...S.map(a=>a.risk)), maxOrg=Math.max(1e-30,...organs.map(o=>orgRisk[o]));
+  const wOf=(v,mx)=>0.8+5.2*Math.sqrt(Math.max(0,v)/mx);
+  const W=920, top=64, bot=34, cols={S:78,K:352,H:592,O:812};
+  const nRows=Math.max(S.length,kcSet.length,hubs.length,organs.length,1);
+  const H=Math.max(300, top+bot+nRows*66);
+  const yP=(n,k)=>top+(k+0.5)*(H-top-bot)/Math.max(1,n);
+  const Sy=S.map((a,k)=>yP(S.length,k)), Ky={},Hy={},Oy={};
+  kcSet.forEach((j,k)=>Ky[j]=yP(kcSet.length,k)); hubs.forEach((h,k)=>Hy[h]=yP(hubs.length,k)); organs.forEach((o,k)=>Oy[o]=yP(organs.length,k));
+  const E=[];
+  S.forEach((a,si)=>a.kc.forEach(j=>{ E.push({x1:cols.S+32,y1:Sy[si],x2:cols.K-86,y2:Ky[j],w:wOf(a.risk,maxRisk),c:ARM[armOf(j)]}); }));
+  kcSet.forEach(j=>{ const arm=armOf(j), inc=S.filter(a=>a.kc.includes(j)).reduce((t,a)=>t+a.risk,0);
+    if(arm!=='prom'&&hubHasInit) E.push({x1:cols.K+86,y1:Ky[j],x2:cols.H-66,y2:Hy['init'],w:wOf(inc,maxRisk),c:HUB.init});
+    if(arm!=='gen'&&hubHasProm) E.push({x1:cols.K+86,y1:Ky[j],x2:cols.H-66,y2:Hy['prom'],w:wOf(inc,maxRisk),c:HUB.prom}); });
+  hubs.forEach(h=>organs.forEach(o=>{ if(orgArm[o][h]) E.push({x1:cols.H+66,y1:Hy[h],x2:cols.O-50,y2:Oy[o],w:wOf(orgRisk[o],maxOrg),c:HUB[h],op:0.5}); }));
+  let edges='';
+  if(AON_MODE==='flow') E.forEach(e=>edges+=`<path d="${_aonBand(e.x1,e.y1,e.x2,e.y2,Math.max(1.6,e.w*1.7))}" fill="${e.c}" fill-opacity="${e.op||0.26}"/>`);
+  else E.forEach(e=>edges+=`<path d="${_aonEdge(e.x1,e.y1,e.x2,e.y2)}" fill="none" stroke="${e.c}" stroke-width="${e.w.toFixed(2)}" stroke-opacity="${e.op||0.62}" stroke-linecap="round"/>`);
+  const defs='<filter id="redifyA" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.843  0 0 0 0 0.149  0 0 0 0 0.239  -0.333 -0.333 -0.333 0 1" result="r"/><feComponentTransfer in="r" result="r2"><feFuncA type="table" tableValues="0 0 0 0.55 1 1"/></feComponentTransfer><feComposite in="r2" in2="SourceGraphic" operator="in"/></filter>';
+  const base=(document.getElementById('tcUrl')?document.getElementById('tcUrl').value:'').replace(/\/$/,'');
+  let nodes='';
+  S.forEach((a,si)=>{ const y=Sy[si], nm=(a.s.name||('stressor '+(a.i+1))).slice(0,18);
+    nodes+=(a.s.dtxsid?`<image href="${base}/structure/${a.s.dtxsid}" x="${cols.S-31}" y="${y-21}" width="62" height="42" preserveAspectRatio="xMidYMid meet" filter="url(#redifyA)"/>`:`<circle cx="${cols.S}" cy="${y}" r="12" fill="#d7263d" fill-opacity="0.8"/>`)
+      +`<text x="${cols.S}" y="${y+34}" text-anchor="middle" font-size="10" fill="var(--ink)" font-weight="600">${nm}</text>`; });
+  kcSet.forEach(j=>{ const y=Ky[j],arm=armOf(j),c=ARM[arm],conv=kcN[j]>1,w=170,h=30, short=(KCS[j].n||'').replace(/^\d+\.\s*/,''), lab=short.length>27?short.slice(0,26)+'…':short;
+    nodes+=`<g>${conv?`<rect x="${cols.K-w/2-3}" y="${y-h/2-3}" width="${w+6}" height="${h+6}" rx="10" fill="none" stroke="${c}" stroke-width="1" stroke-opacity="0.55"/>`:''}<rect x="${cols.K-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="7" fill="${c}" fill-opacity="${conv?0.30:0.15}" stroke="${c}" stroke-width="${conv?2:1}"/><text x="${cols.K-w/2+9}" y="${y+3.5}" font-size="9.5" fill="var(--ink)"><tspan font-weight="700">${j+1}.</tspan> ${lab}</text>${conv?`<text x="${cols.K+w/2-4}" y="${y-h/2-5}" text-anchor="end" font-size="8.5" fill="${c}" font-weight="700">shared ×${kcN[j]}</text>`:''}</g>`; });
+  const HL={init:'Initiation · mutation',prom:'Promotion · selection'};
+  hubs.forEach(h=>{ const y=Hy[h],c=HUB[h],w=132,hh=34;
+    nodes+=`<rect x="${cols.H-w/2}" y="${y-hh/2}" width="${w}" height="${hh}" rx="17" fill="${c}" fill-opacity="0.22" stroke="${c}" stroke-width="1.5"/><text x="${cols.H}" y="${y+3.5}" text-anchor="middle" font-size="10" fill="var(--ink)" font-weight="600">${HL[h]}</text>`; });
+  organs.forEach(o=>{ const y=Oy[o],c=heatColor(orgRisk[o])||'#7f8c8d',conv=orgN[o]>1,w=98,hh=42,tc=_txtOn(c);
+    nodes+=`<g><rect x="${cols.O-w/2}" y="${y-hh/2}" width="${w}" height="${hh}" rx="9" fill="${c}" fill-opacity="0.9" stroke="${conv?'#ffffff':'#1c2a3a'}" stroke-width="${conv?2:1}"/><text x="${cols.O}" y="${y-3}" text-anchor="middle" font-size="10" fill="${tc}" font-weight="700">${ORGAN_LABEL[o]||o}</text><text x="${cols.O}" y="${y+11}" text-anchor="middle" font-size="9" fill="${tc}">${fmtRiskV(orgRisk[o])}</text>${conv?`<text x="${cols.O}" y="${y-hh/2-5}" text-anchor="middle" font-size="8.5" fill="var(--muted)" font-weight="700">shared ×${orgN[o]}</text>`:''}</g>`; });
+  const hdr=`<text x="${cols.S}" y="26" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700">STRESSOR</text><text x="${cols.K}" y="26" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700">KEY EVENTS · IARC KC</text><text x="${cols.H}" y="26" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700">MECHANISM</text><text x="${cols.O}" y="26" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="700">ADVERSE OUTCOME</text>`;
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${hdr}${edges}${nodes}</svg>`;
+}
+
+// ============================ CHEMICAL-SPECIFIC AOP CASCADE (AOP-Wiki) ============================
+// Curated MIE→KE→AO chains from AOP-Wiki (see AOP_chains_provenance.md). tier: 0=MIE,1=KE,2=tissue-KE(clonal).
+// Canonical KE ontology (shared vocabulary): id -> {t: 0=MIE,1=KE,2=tissue-KE ; n: label}.
+// Chemicals are described by MEMBERSHIP in these shared KEs, so convergence is emergent.
+const AOP_EVENTS={
+  cyp:{t:0,n:'CYP2E1 activation'}, ahr:{t:0,n:'Sustained AhR activation'}, adduct:{t:0,n:'Bulky DNA adducts'},
+  er:{t:0,n:'Estrogen-receptor agonism'}, asbind:{t:0,n:'As(III)–thiol / Zn-finger binding'}, ppar:{t:0,n:'PPARα activation'}, dpc:{t:0,n:'DNA-protein crosslinks'},
+  reactive:{t:0,n:'Reactive electrophile / metabolite'}, recept:{t:0,n:'Receptor / signalling activation'},
+  oxstress:{t:1,n:'Oxidative stress'}, oxdna:{t:1,n:'Oxidative DNA damage'}, strand:{t:1,n:'DNA strand breaks'},
+  repair:{t:1,n:'Inadequate DNA repair'}, mut:{t:1,n:'Mutations'}, epigen:{t:1,n:'Epigenetic dysregulation'},
+  inflam:{t:1,n:'Injury & inflammation'}, prolif:{t:1,n:'Sustained proliferation'},
+  apop:{t:1,n:'Inhibited apoptosis / homeostasis'}, heptox:{t:1,n:'Hepatotoxicity'}, hepcyto:{t:1,n:'Hepatocytotoxicity'},
+  erdna:{t:1,n:'ER–DNA binding'}, dnadmg:{t:1,n:'DNA damage & mutation'}, signal:{t:1,n:'Altered proliferation signalling'},
+  clonal:{t:2,n:'Clonal expansion of initiated cells'} };
+// Per-chemical: MIE + ordered shared-KE membership (chain) + target-organ AO + confidence (0-1) + optional
+// modifier edge {from,to,label} = this chemical alters another's KER (e.g. arsenic repair inhibition -> co-mutagenesis).
+const AOP_CHAINS={
+  '1746-01-6':{arm:'prom',ref:'AOP 41',conf:0.8,chain:['ahr','apop','heptox','prolif','clonal'],ao:'liver'},
+  '50-32-8':{arm:'gen',ref:'AOP 397',conf:0.75,chain:['adduct','repair','mut','prolif','clonal'],ao:'lung'},
+  '7440-38-2':{arm:'gen',ref:'IARC / AOP 296',conf:0.75,chain:['asbind','oxstress','oxdna','repair','mut','epigen','prolif','clonal'],ao:'liver',mod:{from:'oxdna',to:'mut',label:'As repair inhibition → mutation fixation'}},
+  '71-43-2':{arm:'gen',ref:'AOP 296*',conf:0.55,chain:['oxdna','strand','repair','mut','clonal'],ao:'marrow'},
+  '50-00-0':{arm:'gen',ref:'IARC 100F (DNA-protein crosslinks)',conf:0.7,chain:['dpc','repair','mut','prolif','clonal'],ao:'naso'},
+  '80-05-7':{arm:'prom',ref:'AOP 200',conf:0.7,chain:['er','erdna','prolif','clonal'],ao:'repro'},
+  '67-66-3':{arm:'prom',ref:'AOP 220',conf:0.7,chain:['cyp','oxstress','hepcyto','prolif','clonal'],ao:'liver'},
+  '123-91-1':{arm:'prom',ref:'AOP 220',conf:0.8,chain:['cyp','oxstress','oxdna','inflam','prolif','clonal'],ao:'liver'} };
+function _genChain(a){ const gen=((a.kc||[]).some(j=>j<=2))||((+a.s.g||0)>=(+a.s.p||0));
+  return gen?{arm:'gen',ref:'model',conf:0.4,chain:['reactive','dnadmg','clonal'],ao:a.organ}
+           :{arm:'prom',ref:'model',conf:0.4,chain:['recept','signal','clonal'],ao:a.organ}; }
+let AOP_MODE='graph', AOP_LAST=null;
+function setAopMode(m){ AOP_MODE=m; const g=document.getElementById('aopBtnG'),f=document.getElementById('aopBtnF');
+  if(g&&f){ g.classList.toggle('on',m==='graph'); f.classList.toggle('on',m==='flow'); }
+  if(AOP_LAST) drawAOP(AOP_LAST.sh,AOP_LAST.kap); }
+async function fillAops(){
+  const base=(document.getElementById('tcUrl')?document.getElementById('tcUrl').value:'').replace(/\/$/,'');
+  let n=0, tried=0;
+  for(let i=0;i<STRESSORS.length;i++){ const s=STRESSORS[i]; if(AOP_CHAINS[s.casrn]||s.aop) continue;
+    const q=s.dtxsid||s.casrn||s.name; if(!q) continue; tried++;
+    try{ const r=await fetch(base+'/aop?query='+encodeURIComponent(q)); const d=await r.json();
+      if(d&&d.covered&&d.chain&&d.chain.length){ if(d.events) Object.assign(AOP_EVENTS,d.events);
+        s.aop={arm:d.arm||'gen',ref:(d.ref||'AOP-Wiki')+' ·',conf:d.conf||0.6,chain:d.chain,ao:d.organ||organOf(s),events:d.events||{},source:'aop-wiki',urls:d.urls}; n++; }
+    }catch(e){}
+  }
+  run();
+  if(tried===0) alert('Every stressor already has a curated (Tier-1) AOP.');
+  else if(n===0) alert('No AOP-Wiki pathway found for the uncovered stressor(s). The chemical→AOP pointer is extensible (aop_client.CAS_TO_AOPS).');
+}
+function drawAOP(sh,kap){
+  const host=document.getElementById('aopMap'); if(!host) return; AOP_LAST={sh,kap};
+  const S=STRESSORS.map((s,i)=>({s,i,risk:Math.max(0,(kap[i]||1)*(sh[i]||0)),organ:organOf(s),kc:(s.kc||[]).slice()})).filter(a=>a.risk>0||a.kc.length||a.s.dtxsid);
+  if(!S.length){ host.innerHTML='<div class="note" style="padding:14px">Add a stressor to see its molecular AOP cascade (MIE → key events → adverse outcome).</div>'; return; }
+  S.forEach(a=>{ const c=AOP_CHAINS[a.s.casrn]||a.s.aop; a.ch=c?c:_genChain(a); if(a.ch.events) Object.assign(AOP_EVENTS,a.ch.events); });
+  const evUse={}; S.forEach((a,si)=>a.ch.chain.forEach(id=>{ (evUse[id]=evUse[id]||[]).push(si); }));
+  const evIds=Object.keys(evUse);
+  const orgUse={}; S.forEach((a,si)=>{ (orgUse[a.ch.ao]=orgUse[a.ch.ao]||[]).push(si); });
+  const organs=Object.keys(orgUse);
+  const orgRisk={}; S.forEach(a=>orgRisk[a.ch.ao]=(orgRisk[a.ch.ao]||0)+a.risk);
+  // longest-path layering: each event's column = its causal depth (MIE, KE1, KE2, KE3, ... tissue KE) so every step gets its own column
+  const W=1040, top=64, bot=40, xS=58, xA=W-58;
+  const preds={}; evIds.forEach(id=>preds[id]=[]);
+  S.forEach(a=>{ const ch=a.ch.chain; for(let k=1;k<ch.length;k++) if(preds[ch[k]].indexOf(ch[k-1])<0) preds[ch[k]].push(ch[k-1]); });
+  const colOf={}; evIds.forEach(id=>colOf[id]=0);
+  for(let it=0; it<evIds.length+2; it++){ let chg=false; evIds.forEach(id=>preds[id].forEach(p=>{ if(colOf[p]+1>colOf[id]){ colOf[id]=colOf[p]+1; chg=true; } })); if(!chg) break; }
+  const nCols=Math.max(0,...evIds.map(id=>colOf[id]))+1;
+  const xL=198, xR=W-190, EXcol=c=> nCols<=1?(xL+xR)/2 : xL+(xR-xL)*c/(nCols-1);
+  const colSpan=nCols<=1?150:(xR-xL)/(nCols-1);
+  const NW=Math.max(58,Math.min(140,colSpan-16)), hw=NW/2, mc=Math.max(9,Math.floor(NW/5.7));
+  const colGroups={}; evIds.forEach(id=>{ (colGroups[colOf[id]]=colGroups[colOf[id]]||[]).push(id); });
+  const nRows=Math.max(S.length, organs.length, ...Object.values(colGroups).map(l=>l.length), 1);
+  const H=Math.max(320, top+bot+nRows*62);
+  const yP=(n,k)=>top+(k+0.5)*(H-top-bot)/Math.max(1,n);
+  const Sy=S.map((a,k)=>yP(S.length,k)), EY={},EX={},OY={};
+  Object.keys(colGroups).forEach(c=>{ const list=colGroups[c]; list.forEach((id,k)=>{ EY[id]=yP(list.length,k); EX[id]=EXcol(+c); }); });
+  organs.forEach((o,k)=>OY[o]=yP(organs.length,k));
+  const maxRisk=Math.max(1e-30,...S.map(a=>a.risk)), maxOrg=Math.max(1e-30,...organs.map(o=>orgRisk[o]));
+  const wOf=(v,mx)=>0.5+2.3*Math.sqrt(Math.max(0,v)/mx), ARM={gen:'#e0563a',prom:'#4f93d6'};
+  const cOp=c=>Math.max(0.34,Math.min(0.85,0.30+0.62*(c==null?0.6:c)));   // edge opacity ∝ evidence confidence
+  const E=[], MODS=[];
+  S.forEach((a,si)=>{ const col=ARM[a.ch.arm], wr=wOf(a.risk,maxRisk), ch=a.ch.chain, op=cOp(a.ch.conf);
+    E.push({x1:xS+30,y1:Sy[si],x2:EX[ch[0]]-hw,y2:EY[ch[0]],w:wr,c:col,op});
+    for(let k=0;k<ch.length-1;k++) E.push({x1:EX[ch[k]]+hw,y1:EY[ch[k]],x2:EX[ch[k+1]]-hw,y2:EY[ch[k+1]],w:wr,c:col,op});
+    const last=ch[ch.length-1]; E.push({x1:EX[last]+hw,y1:EY[last],x2:xA-52,y2:OY[a.ch.ao],w:wr,c:col,op:op*0.8});
+    if(a.ch.mod && EX[a.ch.mod.from]!=null && EX[a.ch.mod.to]!=null) MODS.push({fx:EX[a.ch.mod.from],fy:EY[a.ch.mod.from],tx:EX[a.ch.mod.to],ty:EY[a.ch.mod.to],label:a.ch.mod.label}); });
+  let edges='';
+  if(AOP_MODE==='flow') E.forEach(e=>edges+=`<path d="${_aonBand(e.x1,e.y1,e.x2,e.y2,Math.max(1.2,e.w*1.5))}" fill="${e.c}" fill-opacity="${(e.op||0.26)*0.65}"/>`);
+  else E.forEach(e=>edges+=`<path d="${_aonEdge(e.x1,e.y1,e.x2,e.y2)}" fill="none" stroke="${e.c}" stroke-width="${e.w.toFixed(2)}" stroke-opacity="${e.op||0.6}" stroke-linecap="round"/>`);
+  MODS.forEach(m=>{ edges+=`<path d="${_aonEdge(m.fx+hw,m.fy,m.tx-hw,m.ty)}" fill="none" stroke="#ff7597" stroke-width="1.8" stroke-dasharray="2 3" stroke-opacity="0.95"/><text x="${(m.fx+m.tx)/2}" y="${(m.fy+m.ty)/2-6}" text-anchor="middle" font-size="8" fill="#ff9db3" font-weight="600">⊣ ${m.label}</text>`; });
+  const defs='<filter id="redifyB" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.843  0 0 0 0 0.149  0 0 0 0 0.239  -0.333 -0.333 -0.333 0 1" result="r"/><feComponentTransfer in="r" result="r2"><feFuncA type="table" tableValues="0 0 0 0.55 1 1"/></feComponentTransfer><feComposite in="r2" in2="SourceGraphic" operator="in"/></filter>';
+  const base=(document.getElementById('tcUrl')?document.getElementById('tcUrl').value:'').replace(/\/$/,'');
+  let nodes='';
+  S.forEach((a,si)=>{ const y=Sy[si], nm=(a.s.name||('stressor '+(a.i+1))).slice(0,18), ref=a.ch.ref;
+    nodes+=(a.s.dtxsid?`<image href="${base}/structure/${a.s.dtxsid}" x="${xS-30}" y="${y-20}" width="60" height="40" preserveAspectRatio="xMidYMid meet" filter="url(#redifyB)"/>`:`<circle cx="${xS}" cy="${y}" r="11" fill="#d7263d" fill-opacity="0.8"/>`)
+      +`<text x="${xS}" y="${y+32}" text-anchor="middle" font-size="10" fill="var(--ink)" font-weight="600">${nm}</text><text x="${xS}" y="${y+43}" text-anchor="middle" font-size="8.5" fill="var(--muted)">${ref}</text>`; });
+  const TIERC=['#c98a3f','#6f9bbf','#e0a800'];
+  evIds.forEach(id=>{ const ev=AOP_EVENTS[id],x=EX[id],y=EY[id],c=TIERC[ev.t],conv=evUse[id].length>1,w=NW,h=30,lab=ev.n.length>mc?ev.n.slice(0,mc-1)+'…':ev.n;
+    nodes+=`<g>${conv?`<rect x="${x-w/2-3}" y="${y-h/2-3}" width="${w+6}" height="${h+6}" rx="10" fill="none" stroke="${c}" stroke-width="1" stroke-opacity="0.55"/>`:''}<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="7" fill="${c}" fill-opacity="${conv?0.32:0.16}" stroke="${c}" stroke-width="${conv?2:1}"/><text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="9" fill="var(--ink)">${lab}</text>${conv?`<text x="${x+w/2-4}" y="${y-h/2-5}" text-anchor="end" font-size="8.5" fill="${c}" font-weight="700">shared ×${evUse[id].length}</text>`:''}</g>`; });
+  organs.forEach(o=>{ const y=OY[o],c=heatColor(orgRisk[o])||'#7f8c8d',conv=orgUse[o].length>1,w=96,hh=40,tc=_txtOn(c);
+    nodes+=`<g><rect x="${xA-w/2}" y="${y-hh/2}" width="${w}" height="${hh}" rx="9" fill="${c}" fill-opacity="0.9" stroke="${conv?'#ffffff':'#1c2a3a'}" stroke-width="${conv?2:1}"/><text x="${xA}" y="${y-3}" text-anchor="middle" font-size="10" fill="${tc}" font-weight="700">${ORGAN_LABEL[o]||o}</text><text x="${xA}" y="${y+11}" text-anchor="middle" font-size="9" fill="${tc}">${fmtRiskV(orgRisk[o])}</text>${conv?`<text x="${xA}" y="${y-hh/2-5}" text-anchor="middle" font-size="8.5" fill="var(--muted)" font-weight="700">shared ×${orgUse[o].length}</text>`:''}</g>`; });
+  let hdr=`<text x="${xS}" y="26" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="700">STRESSOR</text>`;
+  for(let c=0;c<nCols;c++){ const lab=c===0?'MIE':(c===nCols-1?'TISSUE KE':'KE'+c); hdr+=`<text x="${EXcol(c)}" y="26" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="700">${lab}</text>`; }
+  hdr+=`<text x="${xA}" y="26" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="700">ADVERSE OUTCOME</text>`;
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${hdr}${edges}${nodes}</svg>`;
 }
 
 // ============================ SCENARIOS / EXPORT ============================
-function saveScenario(slot){ if(!LAST){run();} SAVED[slot]={risk:LAST.eaon.risk,stat:LAST.stat.risk,stressors:LAST.stressors,T:LAST.T}; renderSaved(); renderCmp(); }
+function saveScenario(slot){ if(!LAST){run();} const trf=LAST.tr||(r=>r); SAVED[slot]={risk:trf(LAST.eaon.risk),stat:trf(LAST.stat.risk),stressors:LAST.stressors,T:LAST.T}; renderSaved(); renderCmp(); }
 function clearSaved(){ SAVED={}; renderSaved(); renderCmp(); }
 function renderSaved(){
   const el=document.getElementById('saved'); el.innerHTML='';
@@ -475,13 +873,46 @@ function renderCmp(){
     verdict=`<div class="footwrap">Substitution verdict: <b>option ${better}</b> lowers the life-course malignant-transformation probability by <b>${red.toFixed(0)}%</b> (${fmtPct(Math.max(ra,rb))} → ${fmtPct(Math.min(ra,rb))}).</div>`; }
   document.getElementById('cmpTable').innerHTML=`<table><tr><th>Scenario</th><th>eAON</th><th>Static</th></tr>${rows}</table>${verdict}`;
 }
+// ---- Save & load full runs (localStorage + portable .qeaon.json) ----
+function _esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function _loadRuns(){ try{ return JSON.parse(localStorage.getItem('qeaon_runs')||'{}'); }catch(e){ return {}; } }
+function _saveRuns(o){ try{ localStorage.setItem('qeaon_runs', JSON.stringify(o)); }catch(e){ alert('Could not save to browser storage (full or blocked). You can still Export to a file.'); } }
+function captureState(){ const g=id=>{ const e=document.getElementById(id); return e?e.value:null; };
+  return { ts:Date.now(), stressors:JSON.parse(JSON.stringify(STRESSORS)), evalAge:g('evalAge'), suscept:g('suscept'), mcN:g('mcN'), riskMode:RISK_MODE, tissueMode:TISSUE_MODE, params:{...PARAMS} }; }
+function restoreState(st){ if(!st){ return; } STRESSORS=JSON.parse(JSON.stringify(st.stressors||[]));
+  if(st.params) PARAMS={...DEFAULTS,...st.params};
+  const s=(id,v)=>{ const e=document.getElementById(id); if(e&&v!=null) e.value=v; };
+  s('evalAge',st.evalAge); s('suscept',st.suscept); s('mcN',st.mcN);
+  if(st.riskMode){ RISK_MODE=st.riskMode; s('riskMode',st.riskMode); }
+  if(st.tissueMode){ TISSUE_MODE=st.tissueMode; s('tissueMode',st.tissueMode); }
+  renderStressors(); run(); }
+let _RUNKEYS=[];
+function saveRun(){ const inp=document.getElementById('runName'); let nm=((inp&&inp.value)||'').trim(); if(!nm) nm='run '+new Date().toLocaleString();
+  const runs=_loadRuns(); runs[nm]=captureState(); _saveRuns(runs); if(inp)inp.value=''; renderRuns(); }
+function loadRun(i){ restoreState(_loadRuns()[_RUNKEYS[i]]); }
+function delRun(i){ const runs=_loadRuns(); delete runs[_RUNKEYS[i]]; _saveRuns(runs); renderRuns(); }
+function exportRun(i){ const nm=_RUNKEYS[i]; _downloadRun(nm,_loadRuns()[nm]); }
+function _downloadRun(name,st){ const obj=Object.assign({_qeaon:1,name:name},st); const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(String(name).replace(/[^\w.-]+/g,'_')||'qeaon_run')+'.qeaon.json'; a.click(); }
+function importRun(ev){ const f=ev.target.files&&ev.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ const o=JSON.parse(rd.result); const nm=(o.name||f.name.replace(/\.(qeaon\.)?json$/i,''))||'imported run'; const runs=_loadRuns(); runs[nm]=o; _saveRuns(runs); renderRuns(); restoreState(o); }catch(e){ alert('Could not read run file: '+e.message); } };
+  rd.readAsText(f); ev.target.value=''; }
+function renderRuns(){ const host=document.getElementById('runList'); if(!host) return; const runs=_loadRuns();
+  _RUNKEYS=Object.keys(runs).sort((a,b)=>(runs[b].ts||0)-(runs[a].ts||0));
+  if(!_RUNKEYS.length){ host.innerHTML='<div class="note">No saved runs yet — configure a scenario and press <b>Save run</b>.</div>'; return; }
+  host.innerHTML=_RUNKEYS.map((k,i)=>{ const s=runs[k]||{}; const names=(s.stressors||[]).map(z=>z.name).join(', ')||'no exposure'; const when=s.ts?new Date(s.ts).toLocaleString():'';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--line)"><div style="min-width:0;flex:1"><b>${_esc(k)}</b> <span class="note">&middot; ${(s.stressors||[]).length} stressor(s)</span><div class="note" style="opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(names)} &middot; ${when}</div></div><div style="display:flex;gap:4px;flex:none"><button class="sm" onclick="loadRun(${i})">Load</button><button class="sm ghost" title="export to file" onclick="exportRun(${i})">⭳</button><button class="sm ghost" title="delete" onclick="delRun(${i})">✕</button></div></div>`; }).join('');
+}
 function exportReport(){
   if(!LAST){ run(); }
+  const trf=LAST.tr||(r=>r);
   const rep={generated:new Date().toISOString(), model:'q-eAON decision-support prototype',
+    risk_scale:RISK_MODE, gain_S:LAST.S,
     evaluation_age:LAST.T, susceptibility:LAST.suscept, parameters:LAST.params, stressors:LAST.stressors,
-    results:{eaon:LAST.eaon.risk, static_toxicological:LAST.stat.risk, tsce_limit:LAST.tsce.risk, background:LAST.bg,
-      monte_carlo:LAST.mc?{p5:LAST.mc.p5,median:LAST.mc.p50,p95:LAST.mc.p95}:null,
-      shapley:LAST.stressors.map((s,i)=>({stressor:s.name,contribution:LAST.sh[i]}))},
+    results:{eaon:trf(LAST.eaon.risk), static_toxicological:trf(LAST.stat.risk), tsce_limit:trf(LAST.tsce.risk), background:LAST.bg,
+      eaon_mechanistic:LAST.eaon.risk,
+      monte_carlo:LAST.mc?{p5:trf(LAST.mc.p5),median:trf(LAST.mc.p50),p95:trf(LAST.mc.p95)}:null,
+      shapley:LAST.stressors.map((s,i)=>({stressor:s.name,contribution:(LAST.kap?LAST.kap[i]:1)*LAST.sh[i],kappa:LAST.kap?LAST.kap[i]:1}))},
     saved_scenarios:SAVED};
   const blob=new Blob([JSON.stringify(rep,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='qeAON_report.json'; a.click();
@@ -492,8 +923,17 @@ async function integraCompute(i){
   const base=(document.getElementById("tcUrl").value||"").replace(/\/$/,"");
   const res=document.getElementById('ires_'+i);
   const models=[], scenarios={};
-  // blank Backend => same-origin (works when this page is served by the connector)
-  if(s.ifc!=null){ models.push("dietary"); scenarios.dietary={_food_conc_ug_g:s.ifc}; }
+  // "override total daily intake" shortcut: skip INTEGRA entirely, dose = intake / bw.
+  if(s.dietOverride!=null){
+    const bw=(s.ibw!=null?s.ibw:70);
+    s.dose=+(s.dietOverride/1000/bw).toPrecision(6);
+    s._ires="Override: total intake "+(+s.dietOverride).toPrecision(3)+" &micro;g/day &rarr; dose <b>"+(+s.dose).toPrecision(3)+"</b> mg/kg&middot;d. Filled above.";
+    STRESSORS[i]._exopen=true; renderStressors(); run(); return;
+  }
+  // dietary: per-food concentration map (unlisted foods = 0) + adult consumption (g/day)
+  const _conc={}, _amt={};
+  DIET_FOODS.forEach(f=>{ if(s.dietConc && s.dietConc[f.k]!=null && s.dietConc[f.k]!==0){ _conc[f.k]=s.dietConc[f.k]; } _amt[f.k]=dietAmt(s,f); });
+  if(Object.keys(_conc).length){ models.push("dietary"); scenarios.dietary={_food_conc:_conc,_food_amount:_amt}; }
   if(s.iac!=null){ models.push("inhalation"); scenarios.inhalation={_air_conc_ug_m3:s.iac}; }
   if(s.isc!=null){ models.push("nondietary"); scenarios.nondietary={_soil_conc_ug_g:s.isc,_dust_conc_ug_g:s.isc}; }
   if(!models.length){ if(res)res.textContent="Enter at least one concentration (diet, air, or soil/dust)."; return; }
@@ -511,47 +951,52 @@ async function integraCompute(i){
 }
 
 function tcSaveUrl(){ try{ localStorage.setItem("qeaon_tc_url", document.getElementById("tcUrl").value); }catch(e){} }
-async function loadFromToxcast(){
+async function loadGpInto(i){
+  // Fill THIS stressor's g/p, tissue and dose anchor from the hazard DBs (no new stressor).
+  const s=STRESSORS[i];
   const base=(document.getElementById("tcUrl").value||"").replace(/\/$/,"");
-  const q=(document.getElementById("tcQuery").value||"").trim();
-  const st=document.getElementById("tcStatus");
+  const q=(s.name||"").trim();
+  const st=document.getElementById("hz_"+i);
   // blank Backend => same-origin (works when this page is served by the connector)
-  if(!q){ st.textContent="Enter a chemical name, CAS, or DTXSID."; return; }
-  st.textContent="Querying hazard databases…"; tcSaveUrl();
+  if(!q){ if(st)st.textContent="Enter a chemical name, CAS, or DTXSID (or name the stressor above)."; return; }
+  if(st)st.textContent="Querying hazard databases…"; tcSaveUrl();
   try{
     const r=await fetch(base+"/gp?query="+encodeURIComponent(q));
-    if(!r.ok){ st.textContent="Error "+r.status+": "+(await r.text()).slice(0,140); return; }
+    if(!r.ok){ if(st)st.textContent="Error "+r.status+": "+(await r.text()).slice(0,140); return; }
     const d=await r.json();
     const conf=d.confidence||"medium";
     const iarc=(d.cancer&&d.cancer.iarc)?d.cancer.iarc:"no IARC classification";
     if(conf==="low"){
-      st.innerHTML="⚠ <b>"+(d.name||q)+"</b> ("+d.dtxsid+"): no authoritative genotoxicity record and only "+
-        d.n_active_assays+" active ToxCast assay(s) — evidence too sparse to trust. <b>Not added.</b><br>"+
-        "<span style='color:#f59e0b'>Score manually from IARC key characteristics or EPA IRIS.</span>";
-      return;
+      s._hzopen=true;
+      s._hzmsg="⚠ <b>"+(d.name||q)+"</b> ("+(d.dtxsid||"")+"): no authoritative genotoxicity record and only "+
+        d.n_active_assays+" active ToxCast assay(s) — evidence too sparse to trust. g&middot;p left unchanged; "+
+        "<span style='color:#f59e0b'>score manually from IARC key characteristics or EPA IRIS.</span>";
+      renderStressors(); return;
     }
     const kc=(d.kc||[]).filter(k=>k.active_assays>0).map(k=>k.kc-1);
     const dz=d.dose||{};
-    STRESSORS.push({name:d.name||q, start:0, stop:999, intensity:1, g:d.g, p:d.p, kc:kc, _kcopen:true,
-      dose:null, aed_g:(dz.aed_pod_g_mgkgday||null), aed_p:(dz.aed_pod_p_mgkgday||null),
-      pod_g_uM:(dz.pod_g_uM||null), pod_p_uM:(dz.pod_p_uM||null),
-      aed_o:(dz.aed_pod_overall_mgkgday||null), exp:(dz.predicted_exposure_mgkgday||null), ber:(dz.ber||null)});
-    renderStressors(); run();
+    s.name=d.name||s.name; s.g=d.g; s.p=d.p; s.kc=kc; s._kcopen=true; s._hzopen=true;
+    s.dtxsid=d.dtxsid||null; s.casrn=d.casrn||null; s.x50g=X50_BY_CAS[d.casrn]||null;
+    s.tissue=(d.tissue||TISSUE_BY_CAS[d.casrn]||s.tissue||'unspecified');
+    s.aed_g=(dz.aed_pod_g_mgkgday||null); s.aed_p=(dz.aed_pod_p_mgkgday||null);
+    s.pod_g_uM=(dz.pod_g_uM||null); s.pod_p_uM=(dz.pod_p_uM||null);
+    s.aed_o=(dz.aed_pod_overall_mgkgday||null); s.exp=(dz.predicted_exposure_mgkgday||null); s.ber=(dz.ber||null);
+    if(s.dose==null) s.dose=0;   // default 0 exposure until the user enters an uptake/dose or builds an INTEGRA scenario (SEEM available via "use pop. exposure")
     const cc={high:"#16a34a",medium:"#d97706",low:"#dc2626"}[conf]||"#888";
     const tierLine=d.tier?("<span class='note'>"+d.tier+"</span><br>"):"";
     const mechLine=d.mechanism?("<i style='color:#9fb3c8'>"+d.mechanism+"</i><br>"):"";
-    st.innerHTML="Loaded <b>"+(d.name||q)+"</b> ("+(d.dtxsid||d.casrn||"")+"):<br>"+tierLine+
+    s._hzmsg="Loaded <b>"+(d.name||q)+"</b> ("+(d.dtxsid||d.casrn||"")+"):<br>"+tierLine+
       "<b>g="+d.g+"</b> <span class='note'>["+(d.g_source||"")+"]</span><br>"+
       "<b>p="+d.p+"</b> <span class='note'>["+(d.p_source||"")+"]</span><br>"+mechLine+
-      "IARC: "+iarc+" · confidence <b style='color:"+cc+"'>"+conf+"</b>. Added as a stressor — set its exposure window.";
-  }catch(e){ st.textContent="Network/CORS error: "+e.message+" — is the connector running and is this origin allowed (ALLOW_ORIGINS)?"; }
+      "IARC: "+iarc+" · confidence <b style='color:"+cc+"'>"+conf+"</b>. Now set its exposure window / dose.";
+    renderStressors(); run();
+  }catch(e){ if(st)st.textContent="Network/CORS error: "+e.message+" — is the connector running and is this origin allowed (ALLOW_ORIGINS)?"; }
 }
 try{ const _u=localStorage.getItem("qeaon_tc_url"); }catch(e){}
 // init
-PARAMS._cv=0.25; renderParams(); preset('cont');
-try{ const u=localStorage.getItem("qeaon_tc_url"); if(u) document.getElementById("tcUrl").value=u; }catch(e){}
+PARAMS._cv=0.25; renderParams(); preset('cont'); renderRuns();
+try{ const u=localStorage.getItem("qeaon_tc_url"); if(u) document.getElementById("tcUrl").value=u; if(location.protocol!=='file:' && !u){ const _cc=document.getElementById('connCard'); if(_cc) _cc.style.display='none'; } }catch(e){}
 window.addEventListener('resize',()=>{ if(LAST) run(); });
 </script>
 </body>
 </html>
-        
