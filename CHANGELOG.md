@@ -39,3 +39,8 @@ New since the previously published build of the q-eAON decision-support platform
 - The EPA CompTox (`CTX_API_KEY`) and INTEGRA (`INTEGRA_API_KEY`) keys and URLs
   are unchanged. AOP-Wiki needs no key. If your app is already deployed, you do
   **not** re-enter any keys when you update the code.
+
+## Printable report (new)
+- New **"export report (PDF)"** button opens a clean, print-ready report in a new tab —
+  result summary, stressor table, Shapley apportionment, and the AON + molecular AOP
+  diagrams — so you can Save-as-PDF / print correctly instead of printing the live app.

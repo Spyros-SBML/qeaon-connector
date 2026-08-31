@@ -159,6 +159,7 @@
     </div>
 
     <button class="ghost sm" onclick="exportReport()">⤓ export report (JSON)</button>
+    <button class="ghost sm" onclick="exportReportPDF()" title="open a clean, print-ready report (numbers, stressor table, Shapley apportionment and the AON/AOP diagrams) in a new tab, ready to Save as PDF or print">🖶 export report (PDF)</button>
   </div>
 
   <!-- ============ RESULTS ============ -->
@@ -916,6 +917,67 @@ function exportReport(){
     saved_scenarios:SAVED};
   const blob=new Blob([JSON.stringify(rep,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='qeAON_report.json'; a.click();
+}
+
+// Clean, print-ready report in a new tab (numbers + tables + AON/AOP diagrams). Save-as-PDF or print.
+function exportReportPDF(){
+  if(!LAST){ run(); }
+  if(!LAST){ alert('Configure a scenario and press Run first.'); return; }
+  const trf=LAST.tr||(r=>r);
+  const eaon=trf(LAST.eaon.risk), stat=trf(LAST.stat.risk), tsce=trf(LAST.tsce.risk), bg=LAST.bg;
+  const mc=LAST.mc?{p5:trf(LAST.mc.p5),p50:trf(LAST.mc.p50),p95:trf(LAST.mc.p95)}:null;
+  const excess=(stat-bg)!==0?((eaon-bg)/(stat-bg)):NaN;
+  const P=(v)=>(v*100).toPrecision(3)+'%';
+  const sci=(v)=>(v?Number(v).toExponential(2):'0');
+  const esc=(t)=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const contrib=LAST.stressors.map((s,i)=>(LAST.kap?LAST.kap[i]:1)*LAST.sh[i]);
+  const tot=contrib.reduce((a,b)=>a+b,0)||1;
+  const scale=(typeof RISK_MODE!=='undefined'&&RISK_MODE==='absolute')?'Absolute (IRIS-anchored)':(typeof RISK_MODE!=='undefined'?RISK_MODE:'—');
+  const strows=LAST.stressors.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.casrn||'')+'</td><td>'+esc(s.tissue||'')+'</td><td>'+(s.g)+'</td><td>'+(s.p)+'</td><td>'+sci(s.dose)+'</td><td>'+sci(s.aed_o)+'</td><td>'+(s.ber!=null?Math.round(s.ber):'&mdash;')+'</td></tr>').join('');
+  const order=LAST.stressors.map((s,i)=>[i,100*contrib[i]/tot]).sort((a,b)=>b[1]-a[1]);
+  const mx=order.length?order[0][1]:1;
+  const shrows=order.map(([i,pcv])=>'<tr><td>'+esc(LAST.stressors[i].name)+'</td><td>'+sci(contrib[i])+'</td><td>'+pcv.toFixed(1)+'%</td></tr>').join('');
+  const bars=order.map(([i,pcv])=>'<div class="barrow"><span class="bl">'+esc(LAST.stressors[i].name)+'</span><span class="bt"><span class="bf" style="width:'+Math.max(1,150*pcv/(mx||1)).toFixed(1)+'px"></span></span><span class="bv">'+pcv.toFixed(1)+'%</span></div>').join('');
+  const aon=(document.getElementById('aonMap')||{}).innerHTML||'<div class="muted">No network — add a stressor and score its key characteristics.</div>';
+  const aop=(document.getElementById('aopMap')||{}).innerHTML||'<div class="muted">No cascade available.</div>';
+  const gen=new Date().toLocaleString();
+  const css='@page{size:A4;margin:1.4cm 1.5cm}*{box-sizing:border-box}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:10.3pt;line-height:1.42;margin:0}'
+   +'h1{font-size:16pt;margin:0 0 2px}.sub{color:#666;font-size:8.6pt;margin-bottom:12px}'
+   +'h2{font-size:11.5pt;border-bottom:1.4px solid #c0392b;padding-bottom:3px;margin:15px 0 8px;color:#333}'
+   +'.cards{display:flex;gap:7px;margin:5px 0 3px}.card{flex:1;border:1px solid #ddd;border-radius:6px;padding:7px 9px}'
+   +'.card .k{font-size:7.6pt;color:#777;text-transform:uppercase;letter-spacing:.03em}.card .v{font-size:15pt;font-weight:700;color:#c0392b}.card.alt .v{color:#2c6fbb}.card.g .v{color:#333}'
+   +'table{width:100%;border-collapse:collapse;margin:4px 0;font-size:8.7pt}th,td{border:1px solid #ddd;padding:3px 6px;text-align:left}th{background:#f2f4f7;font-weight:700}td:nth-child(n+4){text-align:right}.shap td:nth-child(n+2){text-align:right}'
+   +'.note{font-size:8.2pt;color:#555;margin:5px 0}.muted{color:#889;font-size:9pt;padding:14px}'
+   +'.dia{background:#0d1320;border-radius:8px;padding:10px;margin:4px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact}.dia svg{width:100%;height:auto}'
+   +'.barrow{display:flex;align-items:center;gap:6px;margin:2px 0;font-size:8.6pt}.bl{width:120px;color:#333}.bt{width:154px}.bf{display:inline-block;height:11px;background:#c0392b;opacity:.85;border-radius:2px}.bv{color:#333}'
+   +'.foot{font-size:7.8pt;color:#888;margin-top:10px;border-top:1px solid #eee;padding-top:5px}'
+   +'.noprint{margin:10px 0}@media print{.noprint{display:none}}'
+   +'.legend{font-size:8pt;color:#555;margin:3px 0 10px}.legend b{color:#c0392b}.legend i{color:#2c6fbb;font-style:normal}';
+  const doc='<!DOCTYPE html><html><head><meta charset="utf-8"><title>q-eAON report</title><style>'+css+'</style></head><body>'
+   +'<button class="noprint" onclick="window.print()" style="padding:8px 14px;font-size:11pt;cursor:pointer">🖶 Print / Save as PDF</button>'
+   +'<h1>q-eAON &mdash; Carcinogenicity Decision Support</h1>'
+   +'<div class="sub">Run report &middot; generated '+esc(gen)+' &middot; risk scale: <b>'+esc(scale)+'</b> &middot; evaluation age '+LAST.T+' &middot; susceptibility &times;'+LAST.suscept+'</div>'
+   +'<h2>Result summary</h2><div class="cards">'
+   +'<div class="card"><div class="k">eAON life-course probability</div><div class="v">'+P(eaon)+'</div></div>'
+   +'<div class="card alt"><div class="k">Static AOP (toxicological)</div><div class="v">'+P(stat)+'</div></div>'
+   +'<div class="card g"><div class="k">TSCE limit</div><div class="v">'+P(tsce)+'</div></div>'
+   +'<div class="card g"><div class="k">Background</div><div class="v">'+P(bg)+'</div></div></div>'
+   +'<div class="cards"><div class="card"><div class="k">eAON &divide; static excess</div><div class="v">'+(isFinite(excess)?excess.toFixed(1)+'&times;':'&mdash;')+'</div></div>'
+   +(mc?'<div class="card g"><div class="k">Monte-Carlo 90% CI</div><div class="v" style="font-size:11.5pt">'+P(mc.p5)+' &ndash; '+P(mc.p95)+'</div></div><div class="card g"><div class="k">Monte-Carlo median</div><div class="v" style="font-size:12.5pt">'+P(mc.p50)+'</div></div>':'')
+   +'</div>'
+   +'<div class="note">The static (genotoxic-MIE) reading under-estimates risk because it cannot represent promotion / selection; the eAON captures it. The TSCE column is the constant-rate two-stage value the eAON reduces to. Probabilities are lifetime malignant-transformation probabilities to age '+LAST.T+'.</div>'
+   +'<h2>Exposure scenario &mdash; stressors</h2><table><tr><th>Chemical</th><th>CAS</th><th>Target tissue</th><th>g</th><th>p</th><th>Daily dose (mg kg&#8315;&#185; d&#8315;&#185;)</th><th>AED (mg kg&#8315;&#185; d&#8315;&#185;)</th><th>BER</th></tr>'+strows+'</table>'
+   +'<div class="note">g = variation-generating (genotoxic) channel; p = selection-altering (promoter) channel; AED anchors intensity 1 to a 10&#8315;&#8308; lifetime excess; BER = bioactivity-exposure ratio.</div>'
+   +'<h2>Mixture apportionment (Shapley)</h2><div style="display:flex;gap:16px;align-items:flex-start"><table class="shap" style="width:52%"><tr><th>Chemical</th><th>Absolute contribution</th><th>Share</th></tr>'+shrows+'<tr style="font-weight:700"><td>Mixture total</td><td>'+sci(tot)+'</td><td>100%</td></tr></table><div style="width:46%;padding-top:4px">'+bars+'</div></div>'
+   +'<h2 style="page-break-before:always">Adverse-outcome network (abstract)</h2><div class="dia">'+aon+'</div>'
+   +'<div class="legend">Each stressor feeds a <b>variation-generating (initiation)</b> arm and a <i>selection-altering (promotion)</i> arm, converging on the shared tissue key event of clonal expansion before diverging to organ-specific outcomes.</div>'
+   +'<h2>Adverse-outcome pathway cascade (molecular)</h2><div class="dia">'+aop+'</div>'
+   +'<div class="legend">Molecular initiating event &rarr; key events &rarr; clonal expansion &rarr; organ outcome. <b>Red = genotoxic/initiation</b>, <i>blue = non-genotoxic/promotion</i>; shared key events are the convergent nodes of the network.</div>'
+   +'<div class="foot">Generated by the q-eAON decision-support prototype. Diagrams reproduce the on-screen adverse-outcome network and molecular cascade for this run.</div>'
+   +'</body></html>';
+  const w=window.open('','qeaon_report');
+  if(!w){ alert('Please allow pop-ups for this site to open the printable report.'); return; }
+  w.document.open(); w.document.write(doc); w.document.close(); w.focus();
 }
 
 async function integraCompute(i){
