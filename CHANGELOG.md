@@ -44,3 +44,9 @@ New since the previously published build of the q-eAON decision-support platform
 - New **"export report (PDF)"** button opens a clean, print-ready report in a new tab —
   result summary, stressor table, Shapley apportionment, and the AON + molecular AOP
   diagrams — so you can Save-as-PDF / print correctly instead of printing the live app.
+
+## Print as shown (new)
+- New **“print (as shown)”** button and a print stylesheet: browser Print / Ctrl+P now
+  captures the whole app as it appears (dark theme, every panel, nothing clipped),
+  in landscape. Use this for a PDF that looks like the platform; use “export report
+  (clean PDF)” for the light, formatted one-pager.

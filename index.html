@@ -70,6 +70,22 @@
   .aontog button{background:#16212e;color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:10.5px;padding:2px 10px;margin-left:5px;cursor:pointer}
   .aontog button.on{background:var(--accent);color:#0b1420;border-color:var(--accent);font-weight:700}
   .gp-auto{font-size:10px;color:var(--good)}
+  /* ---- print the app AS SHOWN (dark theme, nothing clipped) ---- */
+  @media print{
+    @page{ size:A4 landscape; margin:8mm; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    html,body{ background:var(--bg) !important; }
+    header{ position:static !important; }
+    /* unclip the two scrolling columns and any inner scroll boxes */
+    .wrap{ display:block !important; min-height:0 !important; }
+    .controls,.results{ max-height:none !important; overflow:visible !important; height:auto !important; }
+    .controls{ border-right:none !important; page-break-after:always; }
+    [style*="overflow:auto"],[style*="overflow: auto"]{ max-height:none !important; overflow:visible !important; }
+    /* keep panels and charts whole across page breaks, scale media to page width */
+    .card,.stressor,.grid2,.cmp,.legend{ break-inside:avoid; page-break-inside:avoid; }
+    canvas,svg,img{ max-width:100% !important; height:auto !important; }
+    .noprint{ display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -158,8 +174,9 @@
       <div class="note" style="margin-top:6px">Saves the whole scenario — every stressor with its retrieved g&middot;p, key characteristics, DTXSID and dose, plus the evaluation settings — in this browser. <b>Load</b> one to keep playing with scenarios without re-querying the connector. Use <b>⭳</b>/<b>Import</b> to move runs between machines.</div>
     </div>
 
-    <button class="ghost sm" onclick="exportReport()">⤓ export report (JSON)</button>
-    <button class="ghost sm" onclick="exportReportPDF()" title="open a clean, print-ready report (numbers, stressor table, Shapley apportionment and the AON/AOP diagrams) in a new tab, ready to Save as PDF or print">🖶 export report (PDF)</button>
+    <button class="ghost sm noprint" onclick="window.print()" title="print / Save as PDF exactly as the app looks (dark theme, all panels) — use landscape">🖶 print (as shown)</button>
+    <button class="ghost sm noprint" onclick="exportReport()">⤓ export report (JSON)</button>
+    <button class="ghost sm noprint" onclick="exportReportPDF()" title="open a clean, light report (numbers, stressor table, Shapley apportionment and the AON/AOP diagrams) in a new tab, ready to Save as PDF">🖶 export report (clean PDF)</button>
   </div>
 
   <!-- ============ RESULTS ============ -->
